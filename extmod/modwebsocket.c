@@ -28,20 +28,23 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "py/mphal.h"
 #include "py/runtime.h"
 #include "py/stream.h"
 #include "extmod/modwebsocket.h"
 
 #if MICROPY_PY_WEBSOCKET
 
-enum { FRAME_HEADER, FRAME_OPT, PAYLOAD, CONTROL };
+enum { FRAME_HEADER, FRAME_OPT, PAYLOAD, CONTROL, DONE };
 
 enum { BLOCKING_WRITE = 0x80 };
+#define BLOCKING BLOCKING_WRITE
 
 typedef struct _mp_obj_websocket_t {
     mp_obj_base_t base;
     mp_obj_t sock;
     uint32_t msg_sz;
+    mp_int_t timeout;
     byte mask[4];
     byte state;
     byte to_recv;
@@ -53,34 +56,71 @@ typedef struct _mp_obj_websocket_t {
     byte ws_flags;
     // Copy of current frame flags
     byte last_flags;
+    bool has_setblocking;
 } mp_obj_websocket_t;
 
 static mp_uint_t websocket_write(mp_obj_t self_in, const void *buf, mp_uint_t size, int *errcode);
-static mp_uint_t websocket_write_raw(mp_obj_t self_in, const byte *header, int hdr_sz, const void *buf, mp_uint_t size, int *errcode);
+static mp_uint_t websocket_write_raw(mp_obj_t self_in, const byte *header, mp_uint_t hdr_sz, const byte *buf, mp_uint_t size, int *errcode);
 
-static mp_obj_t websocket_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
-    mp_arg_check_num(n_args, n_kw, 1, 2, false);
-    mp_get_stream_raise(args[0], MP_STREAM_OP_READ | MP_STREAM_OP_WRITE | MP_STREAM_OP_IOCTL);
+static mp_obj_t websocket_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *all_args) {
+    static const mp_arg_t allowed_args[] = {
+        { MP_QSTR_sock,     MP_ARG_OBJ | MP_ARG_REQUIRED, {.u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_blocking, MP_ARG_BOOL,                  {.u_bool = false } },
+        { MP_QSTR_timeout,  MP_ARG_INT | MP_ARG_KW_ONLY,  {.u_int = -1 } },
+    };
+    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
+    mp_arg_parse_all_kw_array(n_args, n_kw, all_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+    mp_get_stream_raise(args[0].u_obj, MP_STREAM_OP_READ | MP_STREAM_OP_WRITE | MP_STREAM_OP_IOCTL);
     mp_obj_websocket_t *o = mp_obj_malloc(mp_obj_websocket_t, type);
-    o->sock = args[0];
+    o->sock = args[0].u_obj;
     o->state = FRAME_HEADER;
     o->to_recv = 2;
     o->mask_pos = 0;
     o->buf_pos = 0;
     o->opts = FRAME_TXT;
-    if (n_args > 1 && args[1] == mp_const_true) {
-        o->opts |= BLOCKING_WRITE;
+    o->timeout = args[2].u_int;
+    if (args[1].u_bool) {
+        o->opts |= BLOCKING;
     }
+    mp_obj_t dest[2];
+    mp_load_method_protected(o->sock, MP_QSTR_setblocking, dest, false);
+    o->has_setblocking = dest[0] != MP_OBJ_NULL;
+
     return MP_OBJ_FROM_PTR(o);
 }
 
-static mp_uint_t websocket_read(mp_obj_t self_in, void *buf, mp_uint_t size, int *errcode) {
+static mp_uint_t websocket_read_nonblocking(mp_obj_websocket_t *self, const mp_stream_p_t *stream, byte *buffer, mp_uint_t length, mp_uint_t tick_start, int *errcode, bool timeout_enabled) {
+    mp_uint_t total_read = 0;
+    while (total_read < length) {
+        mp_uint_t read = stream->read(self->sock, buffer + total_read, length - total_read, errcode);
+        mp_uint_t tick_current = mp_hal_ticks_ms();
+        if (timeout_enabled && ((tick_current - tick_start) > (mp_uint_t)self->timeout)) {
+            // DEBUG_printf("Read operation timed out after %ld ms\n", tick_current - tick_start);
+            *errcode = MP_ETIMEDOUT;
+            return MP_STREAM_ERROR;
+        }
+        if (read == MP_STREAM_ERROR) {
+            if (*errcode == MP_EAGAIN) {
+                mp_hal_delay_ms(1);
+                continue;
+            }
+            return MP_STREAM_ERROR;
+        }
+        total_read += read;
+    }
+    *errcode = 0;
+    return total_read;
+}
+
+static mp_uint_t websocket_read_inner(mp_obj_t self_in, void *buf, mp_uint_t size, int *errcode) {
     mp_obj_websocket_t *self = MP_OBJ_TO_PTR(self_in);
     const mp_stream_p_t *stream_p = mp_get_stream(self->sock);
-    while (1) {
+    self->state = FRAME_HEADER;
+    mp_uint_t start_tick = mp_hal_ticks_ms();
+    while (true) {
         if (self->to_recv != 0) {
-            mp_uint_t out_sz = stream_p->read(self->sock, self->buf + self->buf_pos, self->to_recv, errcode);
-            if (out_sz == 0 || out_sz == MP_STREAM_ERROR) {
+            mp_uint_t out_sz = websocket_read_nonblocking(self, stream_p, self->buf + self->buf_pos, self->to_recv, start_tick, errcode, self->timeout >= 0);
+            if (out_sz == MP_STREAM_ERROR || out_sz == 0) {
                 return out_sz;
             }
             self->buf_pos += out_sz;
@@ -94,7 +134,6 @@ static mp_uint_t websocket_read(mp_obj_t self_in, void *buf, mp_uint_t size, int
         switch (self->state) {
             case FRAME_HEADER: {
                 // TODO: Split frame handling below is untested so far, so conservatively disable it
-                assert(self->buf[0] & 0x80);
 
                 // "Control frames MAY be injected in the middle of a fragmented message."
                 // So, they must be processed before data frames (and not alter
@@ -170,11 +209,10 @@ static mp_uint_t websocket_read(mp_obj_t self_in, void *buf, mp_uint_t size, int
                 }
 
                 size_t sz = MIN(size, self->msg_sz);
-                out_sz = stream_p->read(self->sock, buf, sz, errcode);
-                if (out_sz == 0 || out_sz == MP_STREAM_ERROR) {
+                out_sz = websocket_read_nonblocking(self, stream_p, buf, sz, start_tick, errcode, self->timeout >= 0);
+                if (out_sz == MP_STREAM_ERROR || out_sz == 0) {
                     return out_sz;
                 }
-
                 sz = out_sz;
                 for (byte *p = buf; sz--; p++) {
                     *p ^= self->mask[self->mask_pos++ & 3];
@@ -216,6 +254,26 @@ static mp_uint_t websocket_read(mp_obj_t self_in, void *buf, mp_uint_t size, int
     }
 }
 
+static mp_uint_t websocket_read(mp_obj_t self_in, void *buf, mp_uint_t size, int *errcode) {
+    mp_obj_websocket_t *self = MP_OBJ_TO_PTR(self_in);
+
+    mp_obj_t dest[3];
+    if (self->has_setblocking) {
+        mp_load_method(self->sock, MP_QSTR_setblocking, dest);
+        dest[2] = mp_const_false;
+        mp_call_method_n_kw(1, 0, dest);
+    }
+
+    mp_uint_t result = websocket_read_inner(self_in, buf, size, errcode);
+
+    if (self->has_setblocking) {
+        dest[2] = (self->opts & BLOCKING) ? mp_const_true : mp_const_false;
+        mp_call_method_n_kw(1, 0, dest);
+    }
+
+    return result;
+}
+
 static mp_uint_t websocket_write(mp_obj_t self_in, const void *buf, mp_uint_t size, int *errcode) {
     mp_obj_websocket_t *self = MP_OBJ_TO_PTR(self_in);
     assert(size < 0x10000);
@@ -233,30 +291,83 @@ static mp_uint_t websocket_write(mp_obj_t self_in, const void *buf, mp_uint_t si
 
     return websocket_write_raw(self_in, header, hdr_sz, buf, size, errcode);
 }
-static mp_uint_t websocket_write_raw(mp_obj_t self_in, const byte *header, int hdr_sz, const void *buf, mp_uint_t size, int *errcode) {
+
+static mp_uint_t websocket_write_raw(mp_obj_t self_in, const byte *header, mp_uint_t hdr_sz, const byte *buf, mp_uint_t size, int *errcode) {
     mp_obj_websocket_t *self = MP_OBJ_TO_PTR(self_in);
+    const mp_stream_p_t *stream_p = mp_get_stream(self->sock);
 
     mp_obj_t dest[3];
-    if (self->opts & BLOCKING_WRITE) {
+    if (self->has_setblocking) {
         mp_load_method(self->sock, MP_QSTR_setblocking, dest);
-        dest[2] = mp_const_true;
-        mp_call_method_n_kw(1, 0, dest);
-    }
-
-    mp_uint_t out_sz = mp_stream_write_exactly(self->sock, header, hdr_sz, errcode);
-    if (*errcode == 0) {
-        out_sz = mp_stream_write_exactly(self->sock, buf, size, errcode);
-    }
-
-    if (self->opts & BLOCKING_WRITE) {
         dest[2] = mp_const_false;
         mp_call_method_n_kw(1, 0, dest);
     }
 
-    if (*errcode != 0) {
-        return MP_STREAM_ERROR;
+    self->state = FRAME_HEADER;
+    mp_uint_t out_sz = MP_STREAM_ERROR;
+    mp_uint_t start_ticks = mp_hal_ticks_ms();
+    mp_uint_t offset = 0;
+    while (true) {
+        switch (self->state) {
+            case FRAME_HEADER: {
+                out_sz = stream_p->write(self->sock, header + offset, hdr_sz - offset, errcode);
+                if (out_sz == MP_STREAM_ERROR) {
+                    if (*errcode != MP_EAGAIN) {
+                        goto done;
+                    }
+                    *errcode = 0;
+                    out_sz = 0;
+                }
+                offset += out_sz;
+                if (offset >= hdr_sz) {
+                    offset = 0;
+                    self->state = PAYLOAD;
+                }
+                break;
+            }
+
+            case PAYLOAD: {
+                out_sz = stream_p->write(self->sock, buf + offset, size - offset, errcode);
+                if (out_sz == MP_STREAM_ERROR) {
+                    if (*errcode != MP_EAGAIN) {
+                        goto done;
+                    }
+                    *errcode = 0;
+                    out_sz = 0;
+                }
+                offset += out_sz;
+                if (offset >= size) {
+                    self->state = DONE;
+                }
+                break;
+            }
+
+            case DONE: {
+                out_sz = size;
+                goto done;
+            }
+
+            default:
+                assert(!"Shouldn't get here");
+                MP_UNREACHABLE;
+        }
+
+        mp_uint_t current_ticks = mp_hal_ticks_ms();
+        if ((current_ticks - start_ticks) > (mp_uint_t)self->timeout) {
+            // DEBUG_printf("Write operation timed out after %ld ms\n", current_ticks - start_ticks);
+            *errcode = MP_ETIMEDOUT;
+            break;
+        }
+        mp_hal_delay_ms(1);
     }
-    return out_sz;
+
+done:
+    if (self->has_setblocking) {
+        dest[2] = (self->opts & BLOCKING) ? mp_const_true : mp_const_false;
+        mp_call_method_n_kw(1, 0, dest);
+    }
+
+    return *errcode != 0 ? MP_STREAM_ERROR : out_sz;
 }
 
 static mp_uint_t websocket_ioctl(mp_obj_t self_in, mp_uint_t request, uintptr_t arg, int *errcode) {
@@ -273,6 +384,11 @@ static mp_uint_t websocket_ioctl(mp_obj_t self_in, mp_uint_t request, uintptr_t 
             int cur = self->opts & FRAME_OPCODE_MASK;
             self->opts = (self->opts & ~FRAME_OPCODE_MASK) | (arg & FRAME_OPCODE_MASK);
             return cur;
+        }
+        case MP_STREAM_TIMEOUT: {
+            mp_int_t timeout = self->timeout;
+            self->timeout = arg;
+            return timeout;
         }
         default:
             *errcode = MP_EINVAL;

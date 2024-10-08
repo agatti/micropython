@@ -11,10 +11,10 @@ MICROPY_ROM_TEXT_COMPRESSION ?= 1
 include $(TOP)/py/py.mk
 
 # Path you your toolchain and openocd installation, leave empty if already in system PATH
-TOOLCHAIN_ROOT = /opt/wch/mounriver-studio-toolchain-riscv/bin/
-OPENOCD_ROOT   = /opt/wch/mounriver-studio-toolchain-openocd/bin/
+TOOLCHAIN_ROOT ?= /opt/wch/mounriver-studio-toolchain-riscv/bin/
+OPENOCD_ROOT   ?= /opt/wch/mounriver-studio-toolchain-openocd/bin/
 
-CROSS_COMPILE ?= $(TOOLCHAIN_ROOT)riscv-none-embed-
+CROSS_COMPILE ?= $(TOOLCHAIN_ROOT)riscv-none-elf-
 
 ###############################################################################
 
@@ -26,8 +26,8 @@ SRC_DIR = bsp/src/
 INC_DIR = bsp/inc/
 
 # Toolchain
-CC = $(TOOLCHAIN_ROOT)riscv-none-embed-gcc
-DB = $(TOOLCHAIN_ROOT)riscv-none-embed-gdb
+CC = $(CROSS_COMPILE)gcc
+DB = $(CROSS_COMPILE)gdb
 
 # Project sources
 SRC_C = \

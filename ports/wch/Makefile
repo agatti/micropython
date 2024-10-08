@@ -33,25 +33,33 @@ DB = $(CROSS_COMPILE)gdb
 # Project sources
 SRC_C = \
 	main.c \
+	modmachine.c \
 	mphalport.c \
 	pin.c \
 	pin_defs_ch32.c \
 	pin_named_pins.c \
-	modmachine.c \
 	shared/libc/string0.c \
 	shared/readline/readline.c \
-	shared/runtime/gchelper_generic.c \
 	shared/runtime/pyexec.c \
-	shared/runtime/stdout_helpers.c \
+	shared/runtime/stdout_helpers.c
     
 SRC_C += $(wildcard $(SRC_DIR)*.c) 
 
 SRC_S += bsp/startup_ch32v30x_D8C.S
 
+SRC_BOARD_O += \
+	shared/runtime/gchelper_native.o \
+	shared/runtime/gchelper_rv32i.o
+
 SRC_C += $(SRC_MOD)
 SRC_CXX += $(SRC_MOD_CXX)
 SRC_QSTR += $(SRC_MOD) $(SRC_MOD_CXX)
-SRC_QSTR += pin.c pin_named_pins.c modmachine.c
+SRC_QSTR += \
+	shared/readline/readline.c \
+	shared/runtime/pyexec.c \
+	pin.c \
+	pin_named_pins.c \
+	modmachine.c
 
 SRC_C += $(BUILD)/pins_$(BOARD).c
 SRC_QSTR += $(BUILD)/pins_$(BOARD).c
@@ -73,6 +81,7 @@ LDFLAGS = -T $(LD_SCRIPT) -nostartfiles -Xlinker --gc-sections --specs=nano.spec
 
 OBJ = $(PY_CORE_O) $(addprefix $(BUILD)/, $(SRC_C:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SRC_S:.S=.o))
+OBJ += $(addprefix $(BUILD)/, $(SRC_BOARD_O))
 
 ###############################################################################
 

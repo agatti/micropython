@@ -41,7 +41,7 @@
 
 // machine.info([dump_alloc_table])
 // Print out lots of information about the board.
-STATIC mp_obj_t machine_info(size_t n_args, const mp_obj_t *args) {
+static mp_obj_t machine_info(size_t n_args, const mp_obj_t *args) {
     // get and print unique id; 96 bits
     /*{
         byte *id = (byte *)MP_HAL_UNIQUE_ID_ADDRESS;
@@ -89,12 +89,12 @@ STATIC mp_obj_t machine_info(size_t n_args, const mp_obj_t *args) {
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(machine_info_obj, 0, 1, machine_info);
 
 // get or set the MCU frequencies
-STATIC mp_obj_t machine_freq(size_t n_args, const mp_obj_t *args) {
+static mp_obj_t machine_freq(size_t n_args, const mp_obj_t *args) {
     mp_raise_NotImplementedError(MP_ERROR_TEXT("machine.freq set not supported yet"));
 }
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(machine_freq_obj, 0, 4, machine_freq);
 
-STATIC const mp_rom_map_elem_t machine_module_globals_table[] = {
+static const mp_rom_map_elem_t machine_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__),            MP_ROM_QSTR(MP_QSTR_machine) },
     { MP_ROM_QSTR(MP_QSTR_info),                MP_ROM_PTR(&machine_info_obj) },
     { MP_ROM_QSTR(MP_QSTR_freq),                MP_ROM_PTR(&machine_freq_obj) },
@@ -102,7 +102,7 @@ STATIC const mp_rom_map_elem_t machine_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_Pin),                 MP_ROM_PTR(&pin_type) },
 };
 
-STATIC MP_DEFINE_CONST_DICT(machine_module_globals, machine_module_globals_table);
+static MP_DEFINE_CONST_DICT(machine_module_globals, machine_module_globals_table);
 
 const mp_obj_module_t mp_module_machine = {
     .base = { &mp_type_module },

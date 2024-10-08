@@ -42,20 +42,22 @@
 // machine.info([dump_alloc_table])
 // Print out lots of information about the board.
 static mp_obj_t machine_info(size_t n_args, const mp_obj_t *args) {
+    const mp_print_t *print = &mp_plat_print;
+
     // get and print unique id; 96 bits
     /*{
         byte *id = (byte *)MP_HAL_UNIQUE_ID_ADDRESS;
-        printf("ID=%02x%02x%02x%02x:%02x%02x%02x%02x:%02x%02x%02x%02x\n", id[0], id[1], id[2], id[3], id[4], id[5], id[6], id[7], id[8], id[9], id[10], id[11]);
+        mp_printf(print, "ID=%02x%02x%02x%02x:%02x%02x%02x%02x:%02x%02x%02x%02x\n", id[0], id[1], id[2], id[3], id[4], id[5], id[6], id[7], id[8], id[9], id[10], id[11]);
     }*/
 
-    printf("DEVID=0x%04x\nREVID=0x%04x\n", (unsigned int)DBGMCU_GetDEVID(), (unsigned int)DBGMCU_GetREVID());
+    mp_printf(print, "DEVID=0x%04x\nREVID=0x%04x\n", (unsigned int)DBGMCU_GetDEVID(), (unsigned int)DBGMCU_GetREVID());
 
     // get and print clock speeds
     {
         RCC_ClocksTypeDef rcc_clocks;
         RCC_GetClocksFreq(&rcc_clocks);
 
-        printf("S=%u\nH=%u\nP1=%u\nP2=%u\n",
+        mp_printf(print, "S=%u\nH=%u\nP1=%u\nP2=%u\n",
             (unsigned int)rcc_clocks.SYSCLK_Frequency,
             (unsigned int)rcc_clocks.HCLK_Frequency,
             (unsigned int)rcc_clocks.PCLK1_Frequency,
@@ -66,22 +68,22 @@ static mp_obj_t machine_info(size_t n_args, const mp_obj_t *args) {
     {
         size_t n_pool, n_qstr, n_str_data_bytes, n_total_bytes;
         qstr_pool_info(&n_pool, &n_qstr, &n_str_data_bytes, &n_total_bytes);
-        printf("qstr:\n  n_pool=%u\n  n_qstr=%u\n  n_str_data_bytes=%u\n  n_total_bytes=%u\n", n_pool, n_qstr, n_str_data_bytes, n_total_bytes);
+        mp_printf(print, "qstr:\n  n_pool=%u\n  n_qstr=%u\n  n_str_data_bytes=%u\n  n_total_bytes=%u\n", n_pool, n_qstr, n_str_data_bytes, n_total_bytes);
     }
 
     // GC info
     {
         gc_info_t info;
         gc_info(&info);
-        printf("GC:\n");
-        printf("  %u total\n", info.total);
-        printf("  %u : %u\n", info.used, info.free);
-        printf("  1=%u 2=%u m=%u\n", info.num_1block, info.num_2block, info.max_block);
+        mp_printf(print, "GC:\n");
+        mp_printf(print, "  %u total\n", info.total);
+        mp_printf(print, "  %u : %u\n", info.used, info.free);
+        mp_printf(print, "  1=%u 2=%u m=%u\n", info.num_1block, info.num_2block, info.max_block);
     }
 
     if (n_args == 1) {
         // arg given means dump gc allocation table
-        gc_dump_alloc_table();
+        gc_dump_alloc_table(print);
     }
 
     return mp_const_none;

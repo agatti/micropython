@@ -52,8 +52,3 @@ typedef long mp_off_t;
 #define MICROPY_HW_MCU_NAME "wch-ch32v307"
 
 #define MP_STATE_PORT MP_STATE_VM
-
-#define MICROPY_PORT_ROOT_POINTERS \
-    const char *readline_hist[8]; \
-    mp_obj_t pin_class_mapper; \
-    mp_obj_t pin_class_map_dict;

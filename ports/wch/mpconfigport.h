@@ -14,7 +14,6 @@
 #define MICROPY_HELPER_REPL               (1)
 #define MICROPY_MODULE_FROZEN_MPY         (0)
 #define MICROPY_ENABLE_EXTERNAL_IMPORT    (1)
-#define MICROPY_GCREGS_SETJMP             (1)
 
 #define MICROPY_ALLOC_PATH_MAX            (256)
 #define MICROPY_ALLOC_PARSE_CHUNK_INIT    (16)

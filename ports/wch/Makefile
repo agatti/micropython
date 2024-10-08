@@ -70,8 +70,12 @@ INCLUDES = -I. -I$(INC_DIR) -I$(BUILD) -I$(TOP)
 # Linker Script
 LD_SCRIPT = bsp/ch32v30x.ld
 
+RV32_ABI = ilp32
+RV32_ARCH = rv32imac
+
 # Compiler Flags
-CFLAGS  = -march=rv32imac -mabi=ilp32 -msmall-data-limit=8 -mno-save-restore -Os
+AFLAGS += -mabi=$(RV32_ABI) -march=$(RV32_ARCH)
+CFLAGS  = -mabi=$(RV32_ABI) -march=$(RV32_ARCH) -msmall-data-limit=8 -mno-save-restore -Os
 CFLAGS += -fmessage-length=0 -fsigned-char -ffunction-sections -fdata-sections -Wunused -Wuninitialized -g 
 CFLAGS += -std=gnu99 
 CFLAGS += $(INCLUDES)

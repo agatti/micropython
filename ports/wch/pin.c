@@ -525,7 +525,7 @@ const mp_obj_type_t pin_type = {
 ///     x3 = machine.Pin.board.X3
 ///     x3_af = x3.af_list()
 ///
-/// x3_af will now contain an array of PinAF objects which are availble on
+/// x3_af will now contain an array of PinAF objects which are available on
 /// pin X3.
 ///
 /// For the PyBoard, x3_af would contain:

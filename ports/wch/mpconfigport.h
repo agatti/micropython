@@ -29,7 +29,6 @@
 #define MICROPY_PY_IO                           (1)
 #define MICROPY_PY_STRUCT                       (1)
 #define MICROPY_PY_SYS                          (1)
-#define MICROPY_PY_SYS                          (1)
 #define MICROPY_PY_TIME                         (0)
 #define MICROPY_PY_MODMACHINE                   (1)
 

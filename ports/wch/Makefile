@@ -9,6 +9,7 @@ MICROPY_ROM_TEXT_COMPRESSION ?= 1
 
 # Include py core make definitions.
 include $(TOP)/py/py.mk
+include $(TOP)/extmod/extmod.mk
 
 # Path you your toolchain and openocd installation, leave empty if already in system PATH
 TOOLCHAIN_ROOT ?= /opt/wch/mounriver-studio-toolchain-riscv/bin/
@@ -37,8 +38,6 @@ SRC_C = \
 	pin_defs_ch32.c \
 	pin_named_pins.c \
 	modmachine.c \
-	modutime.c \
-	extmod/utime_mphal.c \
 	shared/libc/string0.c \
 	shared/readline/readline.c \
 	shared/runtime/gchelper_generic.c \
@@ -52,7 +51,7 @@ SRC_S += bsp/startup_ch32v30x_D8C.S
 SRC_C += $(SRC_MOD)
 SRC_CXX += $(SRC_MOD_CXX)
 SRC_QSTR += $(SRC_MOD) $(SRC_MOD_CXX)
-SRC_QSTR += pin.c pin_named_pins.c modmachine.c modutime.c
+SRC_QSTR += pin.c pin_named_pins.c modmachine.c
 
 SRC_C += $(BUILD)/pins_$(BOARD).c
 SRC_QSTR += $(BUILD)/pins_$(BOARD).c

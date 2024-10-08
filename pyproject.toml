@@ -16,6 +16,7 @@ skip = """
 ./ports/esp32/managed_components,\
 ./ports/nrf/drivers/bluetooth/s1*,\
 ./ports/stm32/usbhost,\
+./ports/wch/bsp,\
 ./tests,\
 ACKNOWLEDGEMENTS,\
 """

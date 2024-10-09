@@ -65,7 +65,9 @@ EXCLUSIONS = [
     # STM32 USB dev/host code is mostly 3rd party.
     "ports/stm32/usbdev/**/*.[ch]",
     "ports/stm32/usbhost/**/*.[ch]",
-    # STM32 build includes generated Python code.
+    # WCH BSP is all 3rd party.
+    "ports/wch/bsp/**/*.[ch]",
+    # Port builds include generated Python code.
     "ports/*/build*",
 ]
 

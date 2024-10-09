@@ -6,11 +6,14 @@
 #include "shared/readline/readline.h"
 #include "shared/runtime/gchelper.h"
 #include "shared/runtime/pyexec.h"
+#include "mphalport.h"
 
 // Allocate memory for the MicroPython GC heap.
 static char heap[4096];
 
 int main(int argc, char **argv) {
+    wch_system_init();
+
     // Initialise the MicroPython runtime.
     mp_stack_ctrl_init();
 

@@ -1,6 +1,8 @@
 #include "ch32v30x.h"
 #include "pin.h"
 
+void wch_system_init(void);
+
 #define IS_GPIO_MODE(MODE) (((MODE) == GPIO_Mode_IN_FLOATING) || \
     ((MODE) == GPIO_Mode_Out_PP) || \
     ((MODE) == GPIO_Mode_Out_OD) || \

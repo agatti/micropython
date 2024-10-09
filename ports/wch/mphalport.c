@@ -1,6 +1,6 @@
 #include "debug.h"
 
-void DeviceInit(void) {
+void wch_system_init(void) {
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
     Delay_Init();
     USART_Printf_Init(115200);

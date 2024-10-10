@@ -5,6 +5,7 @@
  *
  * Copyright (c) 2013, 2014 Damien P. George
  * Copyright (c) 2022 Rakesh Peter
+ * Copyright (c) 2024 Alessandro Gatti
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,10 +25,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-
-#include <stdio.h>
-#include <stdint.h>
-#include <string.h>
 
 #include "py/runtime.h"
 #include "py/mphal.h"
@@ -107,9 +104,10 @@ const pin_obj_t *pin_find(mp_obj_t user_obj) {
     if (mp_obj_is_type(user_obj, &pin_type)) {
         pin_obj = MP_OBJ_TO_PTR(user_obj);
         if (pin_class_debug) {
-            printf("\nPin map passed pin ");
+            const mp_print_t *print = &mp_plat_print;
+            mp_printf(print, "\nPin map passed pin ");
             mp_obj_print(MP_OBJ_FROM_PTR(pin_obj), PRINT_STR);
-            printf("\n");
+            mp_printf(print, "\n");
         }
         return pin_obj;
     }
@@ -121,11 +119,12 @@ const pin_obj_t *pin_find(mp_obj_t user_obj) {
                 mp_raise_ValueError(MP_ERROR_TEXT("Pin.mapper didn't return a Pin object"));
             }
             if (pin_class_debug) {
-                printf("\nPin.mapper maps ");
+                const mp_print_t *print = &mp_plat_print;
+                mp_printf(print, "\nPin.mapper maps ");
                 mp_obj_print(user_obj, PRINT_REPR);
-                printf(" to ");
+                mp_printf(print, " to ");
                 mp_obj_print(o, PRINT_STR);
-                printf("\n");
+                mp_printf(print, "\n");
             }
             return MP_OBJ_TO_PTR(o);
         }
@@ -139,11 +138,12 @@ const pin_obj_t *pin_find(mp_obj_t user_obj) {
         if (elem != NULL && elem->value != MP_OBJ_NULL) {
             mp_obj_t o = elem->value;
             if (pin_class_debug) {
-                printf("Pin.map_dict maps ");
+                const mp_print_t *print = &mp_plat_print;
+                mp_printf(print, "Pin.map_dict maps ");
                 mp_obj_print(user_obj, PRINT_REPR);
-                printf(" to ");
+                mp_printf(print, " to ");
                 mp_obj_print(o, PRINT_STR);
-                printf("\n");
+                mp_printf(print, "\n");
             }
             return MP_OBJ_TO_PTR(o);
         }
@@ -153,11 +153,12 @@ const pin_obj_t *pin_find(mp_obj_t user_obj) {
     pin_obj = pin_find_named_pin(&pin_board_pins_locals_dict, user_obj);
     if (pin_obj) {
         if (pin_class_debug) {
-            printf("Pin.board maps ");
+            const mp_print_t *print = &mp_plat_print;
+            mp_printf(print, "Pin.board maps ");
             mp_obj_print(user_obj, PRINT_REPR);
-            printf(" to ");
+            mp_printf(print, " to ");
             mp_obj_print(MP_OBJ_FROM_PTR(pin_obj), PRINT_STR);
-            printf("\n");
+            mp_printf(print, "\n");
         }
         return pin_obj;
     }
@@ -166,11 +167,12 @@ const pin_obj_t *pin_find(mp_obj_t user_obj) {
     pin_obj = pin_find_named_pin(&pin_cpu_pins_locals_dict, user_obj);
     if (pin_obj) {
         if (pin_class_debug) {
-            printf("Pin.cpu maps ");
+            const mp_print_t *print = &mp_plat_print;
+            mp_printf(print, "Pin.cpu maps ");
             mp_obj_print(user_obj, PRINT_REPR);
-            printf(" to ");
+            mp_printf(print, " to ");
             mp_obj_print(MP_OBJ_FROM_PTR(pin_obj), PRINT_STR);
-            printf("\n");
+            mp_printf(print, "\n");
         }
         return pin_obj;
     }

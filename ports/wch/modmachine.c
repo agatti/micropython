@@ -5,6 +5,7 @@
  *
  * Copyright (c) 2013, 2014 Damien P. George
  * Copyright (c) 2022 Rakesh Peter
+ * Copyright (c) 2024 Alessandro Gatti
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,19 +26,17 @@
  * THE SOFTWARE.
  */
 
-#include <stdio.h>
-#include <string.h>
+#include "ch32v003fun.h"
 
-#include "modmachine.h"
 #include "py/gc.h"
 #include "py/runtime.h"
 #include "py/objstr.h"
 #include "py/mperrno.h"
 #include "py/mphal.h"
-#include "gccollect.h"
-#include "pin.h"
 
-#include "debug.h"
+#include "gccollect.h"
+#include "modmachine.h"
+#include "wch_platform.h"
 
 // machine.info([dump_alloc_table])
 // Print out lots of information about the board.
@@ -52,17 +51,11 @@ static mp_obj_t machine_info(size_t n_args, const mp_obj_t *args) {
 
     mp_printf(print, "DEVID=0x%04x\nREVID=0x%04x\n", (unsigned int)DBGMCU_GetDEVID(), (unsigned int)DBGMCU_GetREVID());
 
-    // get and print clock speeds
-    {
-        RCC_ClocksTypeDef rcc_clocks;
-        RCC_GetClocksFreq(&rcc_clocks);
+    // Print clock speeds.
 
-        mp_printf(print, "S=%u\nH=%u\nP1=%u\nP2=%u\n",
-            (unsigned int)rcc_clocks.SYSCLK_Frequency,
-            (unsigned int)rcc_clocks.HCLK_Frequency,
-            (unsigned int)rcc_clocks.PCLK1_Frequency,
-            (unsigned int)rcc_clocks.PCLK2_Frequency);
-    }
+    wch_clock_tree_t clock_tree = { 0 };
+    get_core_clock_tree_entries(&clock_tree);
+    mp_printf(print, "S=%u\nH=%u\nP1=%u\nP2=%u\n", clock_tree.sysclk, clock_tree.hclk, clock_tree.pclk1, clock_tree.pclk2);
 
     // qstr info
     {

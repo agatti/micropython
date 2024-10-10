@@ -41,6 +41,7 @@ SRC_C = \
 	pin.c \
 	pin_defs_ch32.c \
 	pin_named_pins.c \
+	wch_platform.c \
 	shared/libc/string0.c \
 	shared/readline/readline.c \
 	shared/runtime/pyexec.c \

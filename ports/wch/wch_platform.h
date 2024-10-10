@@ -3,8 +3,6 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2013-2015 Damien P. George
- * Copyright (c) 2022 Rakesh Peter
  * Copyright (c) 2024 Alessandro Gatti
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -25,14 +23,19 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#ifndef MICROPY_INCLUDED_WCH_MODMACHINE_H
-#define MICROPY_INCLUDED_WCH_MODMACHINE_H
 
-#include "py/obj.h"
+#ifndef MICROPY_INCLUDED_WCH_WCH_PLATFORM_H
+#define MICROPY_INCLUDED_WCH_WCH_PLATFORM_H
 
-extern const mp_obj_type_t pin_type;
+#include "mpconfigport.h"
 
-MP_DECLARE_CONST_FUN_OBJ_VAR_BETWEEN(machine_info_obj);
-MP_DECLARE_CONST_FUN_OBJ_VAR_BETWEEN(machine_freq_obj);
+typedef struct _wch_clock_tree_t {
+    mp_uint_t sysclk; // System clock speed.
+    mp_uint_t hclk;   // High performance bus clock speed.
+    mp_uint_t pclk1;  // Low speed peripheral bus clock speed.
+    mp_uint_t pclk2;  // High speed peripheral bus clock speed.
+} wch_clock_tree_t;
 
-#endif // MICROPY_INCLUDED_WCH_MODMACHINE_H
+void get_core_clock_tree_entries(wch_clock_tree_t *tree);
+
+#endif // MICROPY_INCLUDED_WCH_WCH_PLATFORM_H

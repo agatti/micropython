@@ -31,6 +31,12 @@
 #define MICROPY_PY_TIME                         (0)
 #define MICROPY_PY_MODMACHINE                   (1)
 
+// Which serial port should be used for console I/O.
+// Must be MICROPY_PY_UARTx where x must be between 1 and 8, inclusive.
+#ifndef MICROPY_PY_CONSOLE_UART_PORT
+#define MICROPY_PY_CONSOLE_UART_PORT      (MICROPY_PY_UART1)
+#endif
+
 #define MICROPY_PY_BUILTINS_HELP                 (1)
 #define MICROPY_PY_BUILTINS_HELP_MODULES         (1)
 

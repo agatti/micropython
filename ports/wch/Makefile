@@ -81,7 +81,7 @@ AFLAGS += -mabi=$(RV32_ABI) -march=$(RV32_ARCH)
 CFLAGS  = -mabi=$(RV32_ABI) -march=$(RV32_ARCH) -msmall-data-limit=8 -mno-save-restore -Os
 CFLAGS += -fmessage-length=0 -fsigned-char -ffunction-sections -fdata-sections -Wunused -Wuninitialized -g 
 CFLAGS += -std=gnu99 
-CFLAGS += $(INCLUDES)
+CFLAGS += $(INCLUDES) -DCH32V30x
 
 # Linker Flags
 LDFLAGS = -T $(LD_SCRIPT) -nostartfiles -Xlinker --gc-sections --specs=nano.specs --specs=nosys.specs

@@ -1,16 +1,8 @@
-#include "ch32v30x.h"
-#include "pin.h"
+#include "ch32v003fun.h"
+
+#include "py/obj.h"
 
 void wch_system_init(void);
-
-#define IS_GPIO_MODE(MODE) (((MODE) == GPIO_Mode_IN_FLOATING) || \
-    ((MODE) == GPIO_Mode_Out_PP) || \
-    ((MODE) == GPIO_Mode_Out_OD) || \
-    ((MODE) == GPIO_Mode_AF_PP) || \
-    ((MODE) == GPIO_Mode_AF_OD) || \
-    ((MODE) == GPIO_Mode_AIN) || \
-    ((MODE) == GPIO_Mode_IPU) || \
-    ((MODE) == GPIO_Mode_IPD))
 
 static inline mp_uint_t mp_hal_ticks_cpu(void) {
     // Not currently implemented.

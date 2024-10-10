@@ -25,12 +25,10 @@
  * THE SOFTWARE.
  */
 
-#include <stdio.h>
-#include <string.h>
-
 #include "py/runtime.h"
 #include "py/mphal.h"
-#include "pin.h"
+
+#include "machine_pin.h"
 
 MP_DEFINE_CONST_OBJ_TYPE(
     pin_cpu_pins_obj_type,

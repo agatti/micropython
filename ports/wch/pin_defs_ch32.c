@@ -5,6 +5,7 @@
  *
  * Copyright (c) 2013, 2014 Damien P. George
  * Copyright (c) 2022 Rakesh Peter
+ * Copyright (c) 2024 Alessandro Gatti
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,16 +27,14 @@
  */
 
 #include "py/obj.h"
-#include "pin.h"
-#include "debug.h"
+
+#include "machine_pin.h"
+#include "wch_platform.h"
 
 // Ref: CH32FV2x_V3x Reference Manual - Chapter 10 - GPIO and Alternate Function (GPIO/AFIO)
 
-#define mode(pin) ((pin->pin) < 8) ? (((pin->gpio->CFGLR) >> ((pin->pin) * 4)) & 3) : (((pin->gpio->CFGHR) >> ((pin->pin) * 4)) & 3)
-#define cnf(pin)  ((pin->pin) < 8) ? (((pin->gpio->CFGLR) >> (((pin->pin) * 4) + 2)) & 3) : (((pin->gpio->CFGHR) >> (((pin->pin) * 4) + 2)) & 3)
-
 void gpio_clock_enable(const pin_obj_t *pin) {
-    uint32_t rcc_map[] = {0x4, 0x8, 0x10, 0x20, 0x40};   // RCC_APB2Periph_GPIOA..GPIOE
+    static const uint32_t rcc_map[] = { 0x04, 0x08, 0x10, 0x20, 0x40 };   // RCC_APB2Periph_GPIOA..GPIOE
     RCC->APB2PCENR |= rcc_map[pin->port];
 }
 
@@ -49,35 +48,4 @@ void pin_write(const pin_obj_t *pin, bool val) {
     } else {
         pin->gpio->BCR = pin->pin_mask;
     }
-}
-
-// Returns the pin mode. This value returned by this macro should be one of:
-// GPIO_MODE_AIN, GPIO_MODE_IN_FLOATING, GPIO_MODE_IPD, GPIO_MODE_IPU,
-// GPIO_MODE_OUTPUT_PP, GPIO_MODE_OUTPUT_OD, GPIO_MODE_AF_PP, GPIO_MODE_AF_OD.
-uint32_t pin_get_mode(const pin_obj_t *pin) {
-
-    uint8_t mode = mode(pin);
-    uint8_t cnf = cnf(pin);
-
-    if (mode == 0) {
-        if (cnf == 0) {
-            return GPIO_Mode_AIN;
-        } else if (cnf == 1) {
-            return GPIO_Mode_IN_FLOATING;
-        } else if (cnf == 2) {
-            return GPIO_Mode_IPD;                 // TODO: Handle Input Pin Pull Up
-        }
-    } else {
-        if (cnf == 0) {
-            return GPIO_Mode_Out_PP;
-        } else if (cnf == 1) {
-            return GPIO_Mode_Out_OD;
-        } else if (cnf == 2) {
-            return GPIO_Mode_AF_PP;
-        } else if (cnf == 3) {
-            return GPIO_Mode_AF_OD;
-        }
-    }
-
-    return 0xFFFF;
 }

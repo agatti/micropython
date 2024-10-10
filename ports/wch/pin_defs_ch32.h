@@ -4,6 +4,9 @@
  * The MIT License (MIT)
  *
  * Copyright (c) 2013, 2014 Damien P. George
+ * Copyright (c) 2022 Rakesh Peter
+ * Copyright (c) 2024 Alessandro Gatti
+ *
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,7 +27,10 @@
  * THE SOFTWARE.
  */
 
-#include "ch32v30x.h"
+#ifndef MICROPY_INCLUDED_WCH_PIN_DEFS_CH32_H
+#define MICROPY_INCLUDED_WCH_PIN_DEFS_CH32_H
+
+#include "ch32v003fun.h"
 
 // This file contains pin definitions that are specific to the stm32 port.
 // This file should only ever be #included by pin.h and not directly.
@@ -103,3 +109,5 @@ enum {
 };
 
 typedef GPIO_TypeDef pin_gpio_t;
+
+#endif // MICROPY_INCLUDED_WCH_PIN_DEFS_CH32_H

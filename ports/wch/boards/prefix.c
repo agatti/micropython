@@ -1,10 +1,9 @@
 // prefix.c becomes the initial portion of the generated pins file.
 
-#include <stdio.h>
-
 #include "py/obj.h"
 #include "py/mphal.h"
-#include "pin.h"
+
+#include "machine_pin.h"
 
 #define AF(af_idx, af_fn, af_unit, af_type, af_ptr) \
     { \

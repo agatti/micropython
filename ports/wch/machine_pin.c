@@ -28,7 +28,48 @@
 
 #include "py/runtime.h"
 #include "py/mphal.h"
-#include "pin.h"
+
+#include "machine_pin.h"
+#include "wch_platform.h"
+
+static mp_uint_t get_pin_mode(const pin_obj_t *pin) {
+    static const uint8_t MAPPED_STATES[] = {
+        WCH_PIN_ANALOG,                                                   // 0b0000
+        WCH_PIN_OUTPUT,                                                   // 0b0001
+        WCH_PIN_OUTPUT,                                                   // 0b0010
+        WCH_PIN_OUTPUT,                                                   // 0b0011
+        WCH_PIN_INPUT_FLOATING,                                           // 0b0100
+        WCH_PIN_OUTPUT | WCH_PIN_OPEN_DRAIN,                              // 0b0101
+        WCH_PIN_OUTPUT | WCH_PIN_OPEN_DRAIN,                              // 0b0110
+        WCH_PIN_OUTPUT | WCH_PIN_OPEN_DRAIN,                              // 0b0111
+        WCH_PIN_INPUT_FLOATING | WCH_PIN_PULL_UP | WCH_PIN_PULL_DOWN,     // 0b1000
+        WCH_PIN_OUTPUT | WCH_PIN_ALTERNATE_FUNCTION,                      // 0b1001
+        WCH_PIN_OUTPUT | WCH_PIN_ALTERNATE_FUNCTION,                      // 0b1010
+        WCH_PIN_OUTPUT | WCH_PIN_ALTERNATE_FUNCTION,                      // 0b1011
+        WCH_PIN_INVALID_STATE,                                            // 0b1100
+        WCH_PIN_OUTPUT | WCH_PIN_OPEN_DRAIN | WCH_PIN_ALTERNATE_FUNCTION, // 0b1101
+        WCH_PIN_OUTPUT | WCH_PIN_OPEN_DRAIN | WCH_PIN_ALTERNATE_FUNCTION, // 0b1110
+        WCH_PIN_OUTPUT | WCH_PIN_OPEN_DRAIN | WCH_PIN_ALTERNATE_FUNCTION, // 0b1111
+    };
+
+    mp_uint_t bits = 0;
+    if (pin->pin < 8) {
+        bits = MAPPED_STATES[(pin->gpio->CFGLR >> (pin->pin * 4)) & 0x0F];
+    } else {
+        bits = MAPPED_STATES[(pin->gpio->CFGHR >> ((pin->pin - 8) * 4)) & 0x0F];
+    }
+    assert((WCH_PIN_MODE(bits) != WCH_PIN_INVALID_STATE) && "Invalid pin state bits.");
+
+    if (WCH_PIN_MODE(bits) == WCH_PIN_INPUT_FLOATING && WCH_PIN_PULL_UP_PULL_DOWN(bits)) {
+        bits = (bits & ~(WCH_PIN_PULL_UP | WCH_PIN_PULL_DOWN)) |
+            (pin->gpio->OUTDR & pin->pin_mask) ? WCH_PIN_PULL_UP : WCH_PIN_PULL_DOWN;
+    }
+
+    assert(((bits & (WCH_PIN_PULL_UP | WCH_PIN_PULL_DOWN)) != (WCH_PIN_PULL_UP | WCH_PIN_PULL_DOWN)) &&
+        "Invalid pin pullup/pullodwn state.");
+
+    return bits;
+}
 
 /// \moduleref machine
 /// \class Pin - control I/O pins
@@ -188,33 +229,37 @@ static void pin_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t
     // pin name
     mp_printf(print, "Pin(Pin.cpu.%q, mode=Pin.", self->name);
 
-    uint32_t mode = pin_get_mode(self);
+    uint32_t mode = get_pin_mode(self);
+    qstr mode_qstr;
 
-    if (mode == GPIO_Mode_AIN) {
-        // analog
-        mp_print_str(print, "ANALOG_INPUT)");
+    switch (WCH_PIN_MODE(mode)) {
+        case WCH_PIN_ANALOG:
+            mode_qstr = MP_QSTR_ANALOG_INPUT;
+            break;
 
-    } else {
-        // IO mode
-        qstr mode_qst;
+        case WCH_PIN_INPUT_FLOATING:
+            if (mode & WCH_PIN_PULL_UP) {
+                mode_qstr = MP_QSTR_IN_PULL_UP;
+            } else if (mode & WCH_PIN_PULL_DOWN) {
+                mode_qstr = MP_QSTR_IN_PULL_DOWN;
+            } else {
+                mode_qstr = MP_QSTR_IN;
+            }
+            break;
 
-        if (mode == GPIO_Mode_IN_FLOATING) {
-            mode_qst = MP_QSTR_IN;
-        } else if (mode == GPIO_Mode_IPU) {
-            mode_qst = MP_QSTR_IN_PULL_UP;
-        } else if (mode == GPIO_Mode_IPD) {
-            mode_qst = MP_QSTR_IN_PULL_DOWN;
-        } else if (mode == GPIO_Mode_Out_PP) {
-            mode_qst = MP_QSTR_OUT;
-        } else if (mode == GPIO_Mode_Out_OD) {
-            mode_qst = MP_QSTR_OPEN_DRAIN;
-        } else if (mode == GPIO_Mode_AF_PP) {
-            mode_qst = MP_QSTR_ALT;
-        } else {
-            mode_qst = MP_QSTR_ALT_OPEN_DRAIN;
+        case WCH_PIN_OUTPUT: {
+            if (mode & WCH_PIN_OPEN_DRAIN) {
+                mode_qstr = (mode & WCH_PIN_ALTERNATE_FUNCTION) ? MP_QSTR_ALT_OPEN_DRAIN : MP_QSTR_OPEN_DRAIN;
+            } else {
+                mode_qstr = (mode & WCH_PIN_ALTERNATE_FUNCTION) ? MP_QSTR_ALT : MP_QSTR_OUT;
+            }
+            break;
         }
-        mp_print_str(print, qstr_str(mode_qst));
+
+        default:
+            assert(!"Invalid pin mode.");
     }
+    mp_print_str(print, qstr_str(mode_qstr));
     mp_print_str(print, ")");
 }
 
@@ -306,6 +351,15 @@ static mp_obj_t pin_debug(size_t n_args, const mp_obj_t *args) {
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(pin_debug_fun_obj, 1, 2, pin_debug);
 static MP_DEFINE_CONST_CLASSMETHOD_OBJ(pin_debug_obj, MP_ROM_PTR(&pin_debug_fun_obj));
 
+#define IS_GPIO_MODE(MODE) (((MODE) == WCH_PIN_ANALOG) || \
+    ((MODE) == WCH_PIN_INPUT_FLOATING) || \
+    ((MODE) == WCH_PIN_OUTPUT) || \
+    ((MODE) == WCH_PIN_INPUT_FLOATING | WCH_PIN_PULL_UP) || \
+    ((MODE) == WCH_PIN_INPUT_FLOATING | WCH_PIN_PULL_DOWN) || \
+    ((MODE) == WCH_PIN_OUTPUT | WCH_PIN_OPEN_DRAIN) || \
+    ((MODE) == WCH_PIN_OUTPUT | WCH_PIN_ALTERNATE_FUNCTION) || \
+    ((MODE) == WCH_PIN_OUTPUT | WCH_PIN_OPEN_DRAIN | WCH_PIN_ALTERNATE_FUNCTION))
+
 // init(mode, pull=None, alt=-1, *, value, alt)
 static mp_obj_t pin_obj_init_helper(const pin_obj_t *self, size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
     static const mp_arg_t allowed_args[] = {
@@ -333,16 +387,45 @@ static mp_obj_t pin_obj_init_helper(const pin_obj_t *self, size_t n_args, const 
         pin_write(self, mp_obj_is_true(args[3].u_obj));
     }
 
-    // configure the GPIO as requested
-    GPIO_InitTypeDef GPIO_InitStructure;
-    GPIO_InitStructure.GPIO_Pin = self->pin_mask;
-    GPIO_InitStructure.GPIO_Mode = mode;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init(self->gpio, &GPIO_InitStructure);
+    mp_uint_t mapped_mode;
+    switch (WCH_PIN_MODE(mode)) {
+        case WCH_PIN_ANALOG:
+            mapped_mode = 0;
+            break;
+        case WCH_PIN_INPUT_FLOATING:
+            mapped_mode = WCH_PIN_PULL_UP_PULL_DOWN(mode) ? 0x08 : 0x04;
+            break;
+        case WCH_PIN_OUTPUT:
+            if (mode & WCH_PIN_ALTERNATE_FUNCTION) {
+                mapped_mode = (mode & WCH_PIN_OPEN_DRAIN) ? 0x0C : 0x08;
+            } else {
+                mapped_mode = (mode & WCH_PIN_OPEN_DRAIN) ? 0x04 : 0x00;
+            }
+            mapped_mode |= GPIO_Speed_50MHz;
+            break;
+        default:
+            assert(!"Invalid pin mode.");
+            break;
+    }
+
+    volatile uint32_t *mode_register = (volatile uint32_t *)((self->pin < 8) ? &self->gpio->CFGLR : &self->gpio->CFGHR);
+    uint32_t mode_register_bits = *mode_register;
+    mp_uint_t mode_register_shift = (self->pin < 8) ? self->pin : (self->pin - 8);
+    mode_register_bits &= ~(0x0F << mode_register_shift);
+    mode_register_bits |= (mapped_mode & 0x0F) << mode_register_shift;
+    *mode_register = mode_register_bits;
+
+    if (WCH_PIN_PULL_UP_PULL_DOWN(mode)) {
+        mp_uint_t state = self->gpio->OUTDR;
+        state &= ~(self->pin_mask);
+        if (mode & WCH_PIN_PULL_UP) {
+            state |= self->pin_mask;
+        }
+        self->gpio->OUTDR = state;
+    }
 
     return mp_const_none;
 }
-
 
 static mp_obj_t pin_obj_init(size_t n_args, const mp_obj_t *args, mp_map_t *kw_args) {
     return pin_obj_init_helper(MP_OBJ_TO_PTR(args[0]), n_args - 1, args + 1, kw_args);
@@ -431,8 +514,7 @@ static MP_DEFINE_CONST_FUN_OBJ_1(pin_gpio_obj, pin_gpio);
 /// will match one of the allowed constants for the mode argument to the init
 /// function.
 static mp_obj_t pin_mode(mp_obj_t self_in) {
-    uint32_t mode = pin_get_mode(MP_OBJ_TO_PTR(self_in));
-    return MP_OBJ_NEW_SMALL_INT(mode);
+    return MP_OBJ_NEW_SMALL_INT(get_pin_mode(MP_OBJ_TO_PTR(self_in)));
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(pin_mode_obj, pin_mode);
 
@@ -464,21 +546,14 @@ static const mp_rom_map_elem_t pin_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_cpu),     MP_ROM_PTR(&pin_cpu_pins_obj_type) },
 
     // class constants
-    { MP_ROM_QSTR(MP_QSTR_IN),        MP_ROM_INT(GPIO_Mode_IN_FLOATING) },
-    { MP_ROM_QSTR(MP_QSTR_OUT),       MP_ROM_INT(GPIO_Mode_Out_PP) },
-    { MP_ROM_QSTR(MP_QSTR_OPEN_DRAIN), MP_ROM_INT(GPIO_Mode_Out_OD) },
-    { MP_ROM_QSTR(MP_QSTR_ALT),       MP_ROM_INT(GPIO_Mode_AF_PP) },
-    { MP_ROM_QSTR(MP_QSTR_ALT_OPEN_DRAIN), MP_ROM_INT(GPIO_Mode_AF_OD) },
-    { MP_ROM_QSTR(MP_QSTR_ANALOG),    MP_ROM_INT(GPIO_Mode_AIN) },
-    { MP_ROM_QSTR(MP_QSTR_IN_PULL_UP),   MP_ROM_INT(GPIO_Mode_IPU) },
-    { MP_ROM_QSTR(MP_QSTR_IN_PULL_DOWN), MP_ROM_INT(GPIO_Mode_IPD) },
-
-    // legacy class constants
-    { MP_ROM_QSTR(MP_QSTR_OUT_PP),    MP_ROM_INT(GPIO_Mode_Out_PP) },
-    { MP_ROM_QSTR(MP_QSTR_OUT_OD),    MP_ROM_INT(GPIO_Mode_Out_OD) },
-    { MP_ROM_QSTR(MP_QSTR_AF_PP),     MP_ROM_INT(GPIO_Mode_AF_PP) },
-    { MP_ROM_QSTR(MP_QSTR_AF_OD),     MP_ROM_INT(GPIO_Mode_AF_OD) },
-    { MP_ROM_QSTR(MP_QSTR_ANALOG_INPUT), MP_ROM_INT(GPIO_Mode_AIN) },
+    { MP_ROM_QSTR(MP_QSTR_IN),             MP_ROM_INT(WCH_PIN_INPUT_FLOATING) },
+    { MP_ROM_QSTR(MP_QSTR_OUT),            MP_ROM_INT(WCH_PIN_OUTPUT) },
+    { MP_ROM_QSTR(MP_QSTR_OPEN_DRAIN),     MP_ROM_INT(WCH_PIN_OUTPUT | WCH_PIN_OPEN_DRAIN) },
+    { MP_ROM_QSTR(MP_QSTR_ALT),            MP_ROM_INT(WCH_PIN_OUTPUT | WCH_PIN_ALTERNATE_FUNCTION) },
+    { MP_ROM_QSTR(MP_QSTR_ALT_OPEN_DRAIN), MP_ROM_INT(WCH_PIN_OUTPUT | WCH_PIN_OPEN_DRAIN | WCH_PIN_ALTERNATE_FUNCTION) },
+    { MP_ROM_QSTR(MP_QSTR_ANALOG),         MP_ROM_INT(WCH_PIN_ANALOG) },
+    { MP_ROM_QSTR(MP_QSTR_IN_PULL_UP),     MP_ROM_INT(WCH_PIN_INPUT_FLOATING | WCH_PIN_PULL_UP) },
+    { MP_ROM_QSTR(MP_QSTR_IN_PULL_DOWN),   MP_ROM_INT(WCH_PIN_INPUT_FLOATING | WCH_PIN_PULL_DOWN) },
 
     #include "genhdr/pins_af_const.h"
 };

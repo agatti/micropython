@@ -26,9 +26,6 @@ CROSS_COMPILE ?= $(TOOLCHAIN_ROOT)riscv-none-elf-
 BOARD ?= CH32V307EVT
 TARGET = $(BOARD).elf
 
-SRC_DIR = bsp/src/
-INC_DIR = bsp/inc/
-
 # Toolchain
 CC = $(CROSS_COMPILE)gcc
 DB = $(CROSS_COMPILE)gdb
@@ -47,10 +44,6 @@ SRC_C = \
 	shared/runtime/pyexec.c \
 	shared/runtime/stdout_helpers.c \
 	$(SDK_ROOT)/ch32v003fun/ch32v003fun.c
-
-# SRC_C += $(wildcard $(SRC_DIR)*.c)
-
-SRC_S += bsp/startup_ch32v30x_D8C.S
 
 SRC_BOARD_O += \
 	shared/runtime/gchelper_native.o \
@@ -73,7 +66,7 @@ SRC_QSTR += $(BUILD)/pins_$(BOARD).c
 INCLUDES = -I. -I$(INC_DIR) -I$(BUILD) -I$(TOP) -I$(SDK_ROOT)/ch32v003fun
 
 # Linker Script
-LD_SCRIPT = bsp/ch32v30x.ld
+LINKERSCRIPT = $(BUILD)/ch32v307.ld
 
 RV32_ABI = ilp32
 RV32_ARCH = rv32imac
@@ -83,10 +76,10 @@ AFLAGS += -mabi=$(RV32_ABI) -march=$(RV32_ARCH)
 CFLAGS  = -mabi=$(RV32_ABI) -march=$(RV32_ARCH) -msmall-data-limit=8 -mno-save-restore -Os
 CFLAGS += -fmessage-length=0 -fsigned-char -ffunction-sections -fdata-sections -Wunused -Wuninitialized -g
 CFLAGS += -std=gnu99
-CFLAGS += $(INCLUDES) -DCH32V30x
+CFLAGS += $(INCLUDES) -DCH32V30x=1 -DCH32V30x_D8C -DTARGET_MCU_MEMORY_SPLIT=3 -DDISABLED_FLOAT
 
 # Linker Flags
-LDFLAGS = -T $(LD_SCRIPT) -nostartfiles -Xlinker --gc-sections --specs=nano.specs --specs=nosys.specs
+LDFLAGS = -T $(LINKERSCRIPT) -nostartfiles -Xlinker --gc-sections --specs=nano.specs --specs=nosys.specs
 
 OBJ = $(PY_CORE_O) $(addprefix $(BUILD)/, $(SRC_C:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SRC_S:.S=.o))
@@ -122,6 +115,12 @@ $(GEN_PINS_HDR): $(BOARD_PINS) $(MAKE_PINS) $(AF_FILE) $(PREFIX_FILE) | $(HEADER
 all: $(BUILD)/$(TARGET)
 
 $(BUILD)/$(TARGET): $(OBJ)
+	$(CROSS_COMPILE)cpp \
+		-DTARGET_MCU_PACKAGE=CH32V307VCT6 \
+		-DMCU_PACKAGE=1 \
+		-DTARGET_MCU_MEMORY_SPLIT=3 \
+		-DTARGET_MCU_LD=3 \
+		$(SDK_ROOT)/ch32v003fun/ch32v003fun.ld > $(LINKERSCRIPT)
 	$(ECHO) "LINK $@"
 	$(Q)$(CC) $(LDFLAGS) -o $@ $^
 	$(Q)$(SIZE) $@

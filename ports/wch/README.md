@@ -27,6 +27,7 @@ $ make -C mpy-cross
 Then, to build MicroPython for CH32V307, just run:
 ```bash
 $ cd ports/wch
+$ make submodules
 $ make -j`nproc`
 ```
 

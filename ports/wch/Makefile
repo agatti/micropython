@@ -11,9 +11,12 @@ MICROPY_ROM_TEXT_COMPRESSION ?= 1
 include $(TOP)/py/py.mk
 include $(TOP)/extmod/extmod.mk
 
+GIT_SUBMODULES += lib/ch32v003fun
+
 # Path you your toolchain and openocd installation, leave empty if already in system PATH
 TOOLCHAIN_ROOT ?= /opt/wch/mounriver-studio-toolchain-riscv/bin/
 OPENOCD_ROOT   ?= /opt/wch/mounriver-studio-toolchain-openocd/bin/
+SDK_ROOT = $(TOP)/lib/ch32v003fun
 
 CROSS_COMPILE ?= $(TOOLCHAIN_ROOT)riscv-none-elf-
 
@@ -65,7 +68,7 @@ SRC_C += $(BUILD)/pins_$(BOARD).c
 SRC_QSTR += $(BUILD)/pins_$(BOARD).c
 
 # Project includes
-INCLUDES = -I. -I$(INC_DIR) -I$(BUILD) -I$(TOP)
+INCLUDES = -I. -I$(INC_DIR) -I$(BUILD) -I$(TOP) -I$(SDK_ROOT)/ch32v003fun
 
 # Linker Script
 LD_SCRIPT = bsp/ch32v30x.ld

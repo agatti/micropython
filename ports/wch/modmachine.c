@@ -43,13 +43,15 @@
 static mp_obj_t machine_info(size_t n_args, const mp_obj_t *args) {
     const mp_print_t *print = &mp_plat_print;
 
-    // get and print unique id; 96 bits
-    /*{
-        byte *id = (byte *)MP_HAL_UNIQUE_ID_ADDRESS;
-        mp_printf(print, "ID=%02x%02x%02x%02x:%02x%02x%02x%02x:%02x%02x%02x%02x\n", id[0], id[1], id[2], id[3], id[4], id[5], id[6], id[7], id[8], id[9], id[10], id[11]);
-    }*/
+    // Print unique ID.
 
-    mp_printf(print, "DEVID=0x%04x\nREVID=0x%04x\n", (unsigned int)DBGMCU_GetDEVID(), (unsigned int)DBGMCU_GetREVID());
+    mp_printf(print, "ID=%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X\n",
+        (uint8_t)(ESIG->UID0 & 0xFF), (uint8_t)((ESIG->UID0 >> 8) & 0xFF),
+        (uint8_t)((ESIG->UID0 >> 16) & 0xFF), (uint8_t)((ESIG->UID0 >> 24) & 0xFF),
+        (uint8_t)(ESIG->UID1 & 0xFF), (uint8_t)((ESIG->UID1 >> 8) & 0xFF),
+        (uint8_t)((ESIG->UID1 >> 16) & 0xFF), (uint8_t)((ESIG->UID1 >> 24) & 0xFF),
+        (uint8_t)(ESIG->UID2 & 0xFF), (uint8_t)((ESIG->UID2 >> 8) & 0xFF),
+        (uint8_t)((ESIG->UID2 >> 16) & 0xFF), (uint8_t)((ESIG->UID2 >> 24) & 0xFF));
 
     // Print clock speeds.
 

@@ -1625,6 +1625,16 @@ static void emit_native_load_subscr(emit_t *emit) {
                 }
                 case VTYPE_PTR16: {
                     // pointer to 16-bit memory
+                    #if N_RV32
+                    #if MICROPY_EMIT_RV32_ZBA
+                    asm_rv32_opcode_sh1add(emit->as, REG_ARG_1, reg_index, REG_ARG_1);
+                    #else
+                    asm_rv32_opcode_cadd(emit->as, REG_ARG_1, reg_index);
+                    asm_rv32_opcode_cadd(emit->as, REG_ARG_1, reg_index);
+                    #endif
+                    asm_rv32_opcode_lhu(emit->as, REG_RET, REG_ARG_1, 0);
+                    break;
+                    #endif
                     ASM_ADD_REG_REG(emit->as, REG_ARG_1, reg_index); // add index to base
                     ASM_ADD_REG_REG(emit->as, REG_ARG_1, reg_index); // add index to base
                     ASM_LOAD16_REG_REG(emit->as, REG_RET, REG_ARG_1); // load from (base+2*index)
@@ -1633,8 +1643,12 @@ static void emit_native_load_subscr(emit_t *emit) {
                 case VTYPE_PTR32: {
                     // pointer to word-size memory
                     #if N_RV32
+                    #if MICROPY_EMIT_RV32_ZBA
+                    asm_rv32_opcode_sh2add(emit->as, REG_ARG_1, reg_index, REG_ARG_1);
+                    #else
                     asm_rv32_opcode_slli(emit->as, REG_TEMP2, reg_index, 2);
                     asm_rv32_opcode_cadd(emit->as, REG_ARG_1, REG_TEMP2);
+                    #endif
                     asm_rv32_opcode_lw(emit->as, REG_RET, REG_ARG_1, 0);
                     break;
                     #endif
@@ -1900,6 +1914,15 @@ static void emit_native_store_subscr(emit_t *emit) {
                     #if N_ARM
                     asm_arm_strh_reg_reg_reg(emit->as, reg_value, REG_ARG_1, reg_index);
                     break;
+                    #elif N_RV32
+                    #if MICROPY_EMIT_RV32_ZBA
+                    asm_rv32_opcode_sh1add(emit->as, REG_ARG_1, reg_index, REG_ARG_1);
+                    #else
+                    asm_rv32_opcode_cadd(emit->as, REG_ARG_1, reg_index);
+                    asm_rv32_opcode_cadd(emit->as, REG_ARG_1, reg_index);
+                    #endif
+                    asm_rv32_opcode_sh(emit->as, reg_value, REG_ARG_1, 0);
+                    break;
                     #endif
                     ASM_ADD_REG_REG(emit->as, REG_ARG_1, reg_index); // add index to base
                     ASM_ADD_REG_REG(emit->as, REG_ARG_1, reg_index); // add index to base
@@ -1912,8 +1935,12 @@ static void emit_native_store_subscr(emit_t *emit) {
                     asm_arm_str_reg_reg_reg(emit->as, reg_value, REG_ARG_1, reg_index);
                     break;
                     #elif N_RV32
+                    #if MICROPY_EMIT_RV32_ZBA
+                    asm_rv32_opcode_sh2add(emit->as, REG_ARG_1, reg_index, REG_ARG_1);
+                    #else
                     asm_rv32_opcode_slli(emit->as, REG_TEMP2, reg_index, 2);
                     asm_rv32_opcode_cadd(emit->as, REG_ARG_1, REG_TEMP2);
+                    #endif
                     asm_rv32_opcode_sw(emit->as, reg_value, REG_ARG_1, 0);
                     break;
                     #endif

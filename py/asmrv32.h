@@ -342,6 +342,22 @@ static inline void asm_rv32_opcode_or(asm_rv32_t *state, mp_uint_t rd, mp_uint_t
     asm_rv32_emit_word_opcode(state, RV32_ENCODE_TYPE_R(0x33, 0x06, 0x00, rd, rs1, rs2));
 }
 
+#if MICROPY_EMIT_RV32_ZBA
+
+// SH1ADD RD, RS1, RS2
+static inline void asm_rv32_opcode_sh1add(asm_rv32_t *state, mp_uint_t rd, mp_uint_t rs1, mp_uint_t rs2) {
+    // R: 0010000 ..... ..... 010 ..... 0110011
+    asm_rv32_emit_word_opcode(state, RV32_ENCODE_TYPE_R(0x33, 0x02, 0x10, rd, rs1, rs2));
+}
+
+// SH2ADD RD, RS1, RS2
+static inline void asm_rv32_opcode_sh2add(asm_rv32_t *state, mp_uint_t rd, mp_uint_t rs1, mp_uint_t rs2) {
+    // R: 0010000 ..... ..... 100 ..... 0110011
+    asm_rv32_emit_word_opcode(state, RV32_ENCODE_TYPE_R(0x33, 0x04, 0x10, rd, rs1, rs2));
+}
+
+#endif
+
 // SLL RD, RS1, RS2
 static inline void asm_rv32_opcode_sll(asm_rv32_t *state, mp_uint_t rd, mp_uint_t rs1, mp_uint_t rs2) {
     // R: 0000000 ..... ..... 001 ..... 0110011

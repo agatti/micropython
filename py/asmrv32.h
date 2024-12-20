@@ -114,6 +114,9 @@ typedef struct _asm_rv32_t {
     mp_uint_t stack_size;
     // The stack offset where stack-based locals start to be stored.
     mp_uint_t locals_stack_offset;
+    #if MICROPY_EMIT_RV32_ZCMP
+    mp_uint_t skip_final_ret_opcode : 1;
+    #endif
 } asm_rv32_t;
 
 void asm_rv32_entry(asm_rv32_t *state, mp_uint_t locals);
@@ -176,6 +179,14 @@ void asm_rv32_end_pass(asm_rv32_t *state);
 
 #define RV32_ENCODE_TYPE_CSS(op, ft3, rs, imm) \
     ((op & 0x03) | ((ft3 & 0x07) << 13) | ((rs & 0x1F) << 2) | ((imm) & 0x3F) << 7)
+
+#if MICROPY_EMIT_RV32_ZCMP
+
+#define RV32_ENCODE_TYPE_ZCMP(op, ft3, ft5, list, imm) \
+    ((op & 0x03) | ((ft3 & 0x07) << 13) | ((ft5 & 0x1F) << 8) | ((list & 0x0F) << 4) | \
+    ((imm & 0x30) >> 2))
+
+#endif
 
 void asm_rv32_emit_word_opcode(asm_rv32_t *state, mp_uint_t opcode);
 void asm_rv32_emit_halfword_opcode(asm_rv32_t *state, mp_uint_t opcode);
@@ -287,6 +298,22 @@ static inline void asm_rv32_opcode_clwsp(asm_rv32_t *state, mp_uint_t rd, mp_uin
     // CI: 010 . ..... ..... 10
     asm_rv32_emit_halfword_opcode(state, RV32_ENCODE_TYPE_CI(0x02, 0x02, rd, ((offset & 0xC0) >> 6) | (offset & 0x3C)));
 }
+
+#if MICROPY_EMIT_RV32_ZCMP
+
+// CM.POPRET {REGLIST}, IMMEDIATE
+static inline void asm_rv32_opcode_cmpopret(asm_rv32_t *state, mp_uint_t reglist, mp_uint_t immediate) {
+    // ZCMP: 101 11110 .... .. 10
+    asm_rv32_emit_halfword_opcode(state, RV32_ENCODE_TYPE_ZCMP(0x02, 0x05, 0x1E, reglist, immediate));
+}
+
+// CM.PUSH {REGLIST}, IMMEDIATE
+static inline void asm_rv32_opcode_cmpush(asm_rv32_t *state, mp_uint_t reglist, mp_uint_t immediate) {
+    // ZCMP: 101 11000 .... .. 10
+    asm_rv32_emit_halfword_opcode(state, RV32_ENCODE_TYPE_ZCMP(0x02, 0x05, 0x18, reglist, immediate));
+}
+
+#endif
 
 // C.MV RD, RS
 static inline void asm_rv32_opcode_cmv(asm_rv32_t *state, mp_uint_t rd, mp_uint_t rs) {

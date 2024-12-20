@@ -195,8 +195,43 @@ void asm_rv32_emit_optimised_load_immediate(asm_rv32_t *state, mp_uint_t rd, mp_
     load_full_immediate(state, rd, immediate);
 }
 
-// RV32 does not have dedicated push/pop opcodes, so series of loads and
-// stores are generated in their place.
+#if MICROPY_EMIT_RV32_ZCMP
+
+#define ZCMP_REGISTERS_MASK (~((1U << ASM_RV32_REG_S0) | (1U << ASM_RV32_REG_S1) | (1U << ASM_RV32_REG_S2) | \
+    (1U << ASM_RV32_REG_S3) | (1U << ASM_RV32_REG_S4) | (1U << ASM_RV32_REG_S5) | (1U << ASM_RV32_REG_S6) | \
+    (1U << ASM_RV32_REG_S7) | (1U << ASM_RV32_REG_S8) | (1U << ASM_RV32_REG_S9) | (1U << ASM_RV32_REG_S10) | \
+    (1U << ASM_RV32_REG_S11) | (1U << ASM_RV32_REG_RA)))
+
+static mp_int_t count_zcmp_registers(mp_uint_t registers_mask) {
+    // RA must always be part of the registers list and no other registers
+    // besides S0-S11 must be in the saved list.
+    if (((registers_mask & (1U << ASM_RV32_REG_RA)) == 0) || ((registers_mask & ZCMP_REGISTERS_MASK) != 0)) {
+        return -1;
+    }
+
+    // The Zcmp opcodes don't operate on specific registers but on a range
+    // of registers instead.  So the function first masks out anything but
+    // the Sx registers in the registers mask, joins those bits into one
+    // single bitmask block, and then scans backwards to see how many
+    // registers are to be saved or restored.  Depending on the
+    // implementation, in the worst case the Zcmp opcodes can be as slow
+    // as the multi-opcode sequences they replace, but they definitely
+    // take way less space than that.
+
+    mp_uint_t mask = ((registers_mask & 0x0FFC0000) >> 16) | ((registers_mask & 0x0300) >> 8);
+    mp_uint_t count = mp_clz(mask) - 20;
+    if (count == 10) {
+        // S10 is paired with S11.
+        count++;
+    }
+    return count;
+}
+
+#endif
+
+// Regular RV32 does not have dedicated push/pop opcodes, so series of loads
+// and stores are generated in their place - unless Zcmp opcodes can be used
+// instead.
 
 static void emit_registers_store(asm_rv32_t *state, mp_uint_t registers_mask) {
     mp_uint_t offset = 0;
@@ -252,6 +287,22 @@ static void emit_function_prologue(asm_rv32_t *state, mp_uint_t registers) {
     mp_uint_t registers_count = MP_POPCOUNT(registers);
     state->stack_size = (registers_count + state->locals_count) * sizeof(uint32_t);
     mp_uint_t old_saved_registers_mask = state->saved_registers_mask;
+    #if MICROPY_EMIT_RV32_ZCMP
+    mp_uint_t s_registers = count_zcmp_registers(registers);
+    if (s_registers >= 0) {
+        mp_uint_t aligned_stack = (state->stack_size + 15) & ~15;
+        if (aligned_stack <= (16 * 3)) {
+            asm_rv32_opcode_cmpush(state, s_registers + 4, aligned_stack);
+        } else {
+            adjust_stack(state, -(state->stack_size - (16 * 3)));
+            asm_rv32_opcode_cmpush(state, s_registers + 4, (16 * 3));
+        }
+        state->locals_stack_offset = registers_count * sizeof(uint32_t);
+        state->saved_registers_mask = old_saved_registers_mask;
+        state->skip_final_ret_opcode = true;
+        return;
+    }
+    #endif
     // Move stack pointer up.
     adjust_stack(state, -state->stack_size);
     // Store registers at the top of the saved stack area.
@@ -263,6 +314,20 @@ static void emit_function_prologue(asm_rv32_t *state, mp_uint_t registers) {
 // Restore registers and reset the stack pointer to its initial value.
 static void emit_function_epilogue(asm_rv32_t *state, mp_uint_t registers) {
     mp_uint_t old_saved_registers_mask = state->saved_registers_mask;
+    #if MICROPY_EMIT_RV32_ZCMP
+    mp_uint_t s_registers = count_zcmp_registers(registers);
+    if (s_registers >= 0) {
+        mp_uint_t aligned_stack = (state->stack_size + 15) & ~15;
+        if (aligned_stack <= (16 * 3)) {
+            asm_rv32_opcode_cmpopret(state, s_registers + 4, aligned_stack);
+        } else {
+            adjust_stack(state, state->stack_size - (16 * 3));
+            asm_rv32_opcode_cmpopret(state, s_registers + 4, (16 * 3));
+        }
+        state->saved_registers_mask = old_saved_registers_mask;
+        return;
+    }
+    #endif
     // Restore registers from the top of the stack area.
     emit_registers_load(state, registers);
     // Move stack pointer down.
@@ -289,6 +354,11 @@ void asm_rv32_entry(asm_rv32_t *state, mp_uint_t locals) {
 
 void asm_rv32_exit(asm_rv32_t *state) {
     emit_function_epilogue(state, state->saved_registers_mask);
+    #if MICROPY_EMIT_RV32_ZCMP
+    if (state->skip_final_ret_opcode) {
+        return;
+    }
+    #endif
     // c.jr ra
     asm_rv32_opcode_cjr(state, ASM_RV32_REG_RA);
 }

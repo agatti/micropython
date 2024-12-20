@@ -195,10 +195,11 @@ void asm_rv32_emit_optimised_load_immediate(asm_rv32_t *state, mp_uint_t rd, mp_
     load_full_immediate(state, rd, immediate);
 }
 
-// RV32 does not have dedicated push/pop opcodes, so series of loads and
-// stores are generated in their place.
+// Regular RV32 does not have dedicated push/pop opcodes, so series of loads
+// and stores are generated in their place - unless Zcmp opcodes can be used
+// instead.
 
-static void emit_registers_store(asm_rv32_t *state, mp_uint_t registers_mask) {
+static void emit_registers_store_sequence(asm_rv32_t *state, mp_uint_t registers_mask) {
     mp_uint_t offset = 0;
     for (mp_uint_t register_index = 0; register_index < AVAILABLE_REGISTERS_COUNT; register_index++) {
         if (registers_mask & (1U << register_index)) {
@@ -210,7 +211,7 @@ static void emit_registers_store(asm_rv32_t *state, mp_uint_t registers_mask) {
     }
 }
 
-static void emit_registers_load(asm_rv32_t *state, mp_uint_t registers_mask) {
+static void emit_registers_load_sequence(asm_rv32_t *state, mp_uint_t registers_mask) {
     mp_uint_t offset = 0;
     for (mp_uint_t register_index = 0; register_index < AVAILABLE_REGISTERS_COUNT; register_index++) {
         if (registers_mask & (1U << register_index)) {
@@ -245,29 +246,182 @@ static void adjust_stack(asm_rv32_t *state, mp_int_t stack_size) {
     asm_rv32_opcode_cadd(state, ASM_RV32_REG_SP, REG_TEMP0);
 }
 
+#if MICROPY_EMIT_RV32_ZCMP
+
+#define ZCMP_REGISTERS_SAVE_MASK ((1U << ASM_RV32_REG_S0) | (1U << ASM_RV32_REG_S1) | (1U << ASM_RV32_REG_S2) | \
+    (1U << ASM_RV32_REG_S3) | (1U << ASM_RV32_REG_S4) | (1U << ASM_RV32_REG_S5) | (1U << ASM_RV32_REG_S6) | \
+    (1U << ASM_RV32_REG_S7) | (1U << ASM_RV32_REG_S8) | (1U << ASM_RV32_REG_S9) | (1U << ASM_RV32_REG_S10) | \
+    (1U << ASM_RV32_REG_S11))
+#define ZCMP_REGISTERS_SKIP_MASK (~((ZCMP_REGISTERS_SAVE_MASK) | (1U << ASM_RV32_REG_SP) | \
+    (1U << ASM_RV32_REG_RA) | (1U << ASM_RV32_REG_ZERO)))
+#define ZCMP_ALIGN_STACK(size) (((size) + 15) & ~15)
+#define ZCMP_ADJUSTED_STACK_THRESHOLD (16 * 3)
+
+static bool prepare_zcmp_opcode(asm_rv32_t *state, mp_uint_t registers, mp_uint_t *s_registers_range, mp_uint_t *other_registers_mask, mp_uint_t *adjustment_stack_value, mp_uint_t *remainder_stack_size) {
+
+    assert(s_registers_range && "S-registers range pointer is NULL.");
+    assert(other_registers_mask && "Other registers mask pointer is NULL.");
+    assert(adjustment_stack_value && "Adjustment stack value pointer is NULL.");
+    assert(remainder_stack_size && "Remainder stack size pointer is NULL.");
+
+    // RA is a mandatory register to save for `cm.push`/`cm.popret`.
+    if ((registers & (1U << ASM_RV32_REG_RA)) == 0) {
+        return false;
+    }
+
+    // The Zcmp `cm.push` and `cm.popret` opcodes don't operate on specific
+    // registers but on a range of registers instead.  So the function first
+    // masks out anything but the S-registers in the registers mask, joins the
+    // two disjoint blocks containing S-register bits into one single
+    // contiguous bitmask block, and then scans backwards to see how many
+    // registers are to be saved or restored.  Depending on the implementation,
+    // in the worst case the Zcmp opcodes can be as slow as the multi-opcode
+    // sequences they replace, but they definitely take way less space than
+    // that (2 bytes total versus either 2 or 4 bytes per register).
+
+    mp_uint_t s_registers_mask = ((registers & 0x0FFC0000) >> 16) | ((registers & 0x0300) >> 8);
+    mp_uint_t s_registers_count = mp_ctz(~s_registers_mask);
+    if (s_registers_count == 10) {
+        // S10 is paired with S11.
+        s_registers_count++;
+    }
+
+    *other_registers_mask = registers & ZCMP_REGISTERS_SKIP_MASK;
+
+    // Check if there are at least 2 S-registers to save (otherwise the
+    // generated opcode sequence would take the same space as a single C.SWSP
+    // instruction in the general registers load/save emitted sequence).  In
+    // theory one should also take into account the potential omission of stack
+    // allocation opcodes but then it gets way too complicated than it already
+    // is.
+
+    if (s_registers_count < 2 || *other_registers_mask != 0) {
+        return false;
+    }
+
+    // Ranges between 0 and 3 are reserved for RV32E.
+    *s_registers_range = s_registers_count + 4;
+
+    // `cm.push`/`cm.popret` will allocate/deallocate enough memory to save and
+    // restore the given amount of registers, but said memory block size will
+    // be aligned to 16 bytes; those opcodes can optionally further adjust the
+    // allocated stack size by either 16, 32, or 48 bytes.  Even if the
+    // requested stack size goes beyond what the opcode can allocate, the
+    // opcode's stack adjustment facilities are still used; that may end up
+    // using a shorter code sequence in `adjust_stack` as the immediate value
+    // for the stack size may fit in a smaller amount of bits.
+
+    mp_uint_t stack_frame_size = ZCMP_ALIGN_STACK(s_registers_count + 1);
+    *adjustment_stack_value = 0;
+    *remainder_stack_size = 0;
+    if (state->stack_size <= stack_frame_size) {
+        return true;
+    }
+
+    // Due to the alignment being performed in 16 bytes increment this
+    // operation this can waste up to 12 bytes (last word on the stack just out
+    // of the last 16 bytes block).  Given that the stack allocation is fixed
+    // at the time opcodes are emitted, the wasted memory cannot really be
+    // reclaimed for something else.
+    //
+    // A more complex check aimed at minimising the amount of wasted stack
+    // space could be implemented, by taking into account how much of the last
+    // block is used and how many registers are left to push/pop, then striking
+    // a balance between how many `c.swsp`/`c.lwsp` opcodes to generate versus
+    // how many stack words to waste.  However, such a scheme is left to
+    // possible future implementations.
+
+    mp_uint_t left = ZCMP_ALIGN_STACK(state->stack_size - stack_frame_size);
+    if (left <= 16) {
+        *adjustment_stack_value = 1;
+        return true;
+    }
+    if (left <= 32) {
+        *adjustment_stack_value = 2;
+        return true;
+    }
+    if (left <= 48) {
+        *adjustment_stack_value = 3;
+        return true;
+    }
+    *adjustment_stack_value = 3;
+    *remainder_stack_size = state->stack_size - stack_frame_size - 48;
+    return true;
+}
+
+static bool emit_zcmp_function_prologue(asm_rv32_t *state, mp_uint_t registers) {
+    mp_uint_t s_registers_range = 0;
+    mp_uint_t other_registers_mask = 0;
+    mp_uint_t adjustment_stack_value = 0;
+    mp_uint_t remainder_stack_size = 0;
+
+    if (!prepare_zcmp_opcode(state, registers, &s_registers_range, &other_registers_mask, &adjustment_stack_value, &remainder_stack_size)) {
+        return false;
+    }
+
+    if (remainder_stack_size > 0) {
+        adjust_stack(state, -remainder_stack_size);
+    }
+    // cm.push {ra, s0-sx}, -adjustment_stack_value * 16
+    asm_rv32_opcode_cmpush(state, s_registers_range, adjustment_stack_value);
+    if (other_registers_mask != 0) {
+        emit_registers_store_sequence(state, other_registers_mask);
+    }
+    return true;
+}
+
+static bool emit_zcmp_function_epilogue(asm_rv32_t *state, mp_uint_t registers) {
+    mp_uint_t s_registers_range = 0;
+    mp_uint_t other_registers_mask = 0;
+    mp_uint_t adjustment_stack_value = 0;
+    mp_uint_t remainder_stack_size = 0;
+
+    if (!prepare_zcmp_opcode(state, registers, &s_registers_range, &other_registers_mask, &adjustment_stack_value, &remainder_stack_size)) {
+        assert(state->skip_final_ret_opcode == 0 && "Epilogue failed but prologue didn't.");
+        return false;
+    }
+    if (other_registers_mask != 0) {
+        emit_registers_store_sequence(state, other_registers_mask);
+    }
+    if (remainder_stack_size > 0) {
+        adjust_stack(state, remainder_stack_size);
+    }
+    // cm.popret {ra, s0-sx}, adjustment_stack_value * 16
+    asm_rv32_opcode_cmpopret(state, s_registers_range, adjustment_stack_value);
+    return true;
+}
+
+#endif
+
 // Generate a generic function entry prologue code sequence, setting up the
 // stack to hold all the tainted registers and an arbitrary amount of space
 // for locals.
 static void emit_function_prologue(asm_rv32_t *state, mp_uint_t registers) {
     mp_uint_t registers_count = MP_POPCOUNT(registers);
     state->stack_size = (registers_count + state->locals_count) * sizeof(uint32_t);
-    mp_uint_t old_saved_registers_mask = state->saved_registers_mask;
+    state->locals_stack_offset = registers_count * sizeof(uint32_t);
+    #if MICROPY_EMIT_RV32_ZCMP
+    if (emit_zcmp_function_prologue(state, registers)) {
+        return;
+    }
+    #endif
     // Move stack pointer up.
     adjust_stack(state, -state->stack_size);
     // Store registers at the top of the saved stack area.
-    emit_registers_store(state, registers);
-    state->locals_stack_offset = registers_count * sizeof(uint32_t);
-    state->saved_registers_mask = old_saved_registers_mask;
+    emit_registers_store_sequence(state, registers);
 }
 
 // Restore registers and reset the stack pointer to its initial value.
 static void emit_function_epilogue(asm_rv32_t *state, mp_uint_t registers) {
-    mp_uint_t old_saved_registers_mask = state->saved_registers_mask;
+    #if MICROPY_EMIT_RV32_ZCMP
+    if (emit_zcmp_function_epilogue(state, registers)) {
+        return;
+    }
+    #endif
     // Restore registers from the top of the stack area.
-    emit_registers_load(state, registers);
+    emit_registers_load_sequence(state, registers);
     // Move stack pointer down.
     adjust_stack(state, state->stack_size);
-    state->saved_registers_mask = old_saved_registers_mask;
 }
 
 static bool calculate_displacement_for_label(asm_rv32_t *state, mp_uint_t label, ptrdiff_t *displacement) {
@@ -289,6 +443,11 @@ void asm_rv32_entry(asm_rv32_t *state, mp_uint_t locals) {
 
 void asm_rv32_exit(asm_rv32_t *state) {
     emit_function_epilogue(state, state->saved_registers_mask);
+    #if MICROPY_EMIT_RV32_ZCMP
+    if (state->skip_final_ret_opcode) {
+        return;
+    }
+    #endif
     // c.jr ra
     asm_rv32_opcode_cjr(state, ASM_RV32_REG_RA);
 }

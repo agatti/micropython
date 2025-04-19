@@ -382,8 +382,9 @@ void asm_thumb_mov_reg_local(asm_thumb_t *as, uint rlo_dest, int local_num); // 
 void asm_thumb_mov_reg_local_addr(asm_thumb_t *as, uint rlo_dest, int local_num); // convenience
 void asm_thumb_mov_reg_pcrel(asm_thumb_t *as, uint rlo_dest, uint label);
 
-void asm_thumb_ldr_reg_reg_i12_optimised(asm_thumb_t *as, uint reg_dest, uint reg_base, uint word_offset); // convenience
-void asm_thumb_ldrh_reg_reg_i12_optimised(asm_thumb_t *as, uint reg_dest, uint reg_base, uint uint16_offset); // convenience
+void asm_thumb_ldr_reg_reg_offset(asm_thumb_t *as, uint reg_dest, uint reg_base, uint word_offset);
+void asm_thumb_ldrb_reg_reg_offset(asm_thumb_t *as, uint reg_dest, uint reg_base, uint byte_offset);
+void asm_thumb_ldrh_reg_reg_offset(asm_thumb_t *as, uint reg_dest, uint reg_base, uint halfword_offset);
 
 void asm_thumb_b_label(asm_thumb_t *as, uint label); // convenience: picks narrow or wide branch
 void asm_thumb_bcc_label(asm_thumb_t *as, int cc, uint label); // convenience: picks narrow or wide branch
@@ -462,11 +463,13 @@ void asm_thumb_b_rel12(asm_thumb_t *as, int rel);
 #define ASM_SUB_REG_REG(as, reg_dest, reg_src) asm_thumb_sub_rlo_rlo_rlo((as), (reg_dest), (reg_dest), (reg_src))
 #define ASM_MUL_REG_REG(as, reg_dest, reg_src) asm_thumb_format_4((as), ASM_THUMB_FORMAT_4_MUL, (reg_dest), (reg_src))
 
-#define ASM_LOAD_REG_REG_OFFSET(as, reg_dest, reg_base, word_offset) asm_thumb_ldr_reg_reg_i12_optimised((as), (reg_dest), (reg_base), (word_offset))
+#define ASM_LOAD_REG_REG_OFFSET(as, reg_dest, reg_base, word_offset) ASM_LOAD32_REG_REG_OFFSET((as), (reg_dest), (reg_base), (word_offset))
 #define ASM_LOAD8_REG_REG(as, reg_dest, reg_base) asm_thumb_ldrb_rlo_rlo_i5((as), (reg_dest), (reg_base), 0)
+#define ASM_LOAD8_REG_REG_OFFSET(as, reg_dest, reg_base, byte_offset) asm_thumb_ldrb_reg_reg_offset((as), (reg_dest), (reg_base), (byte_offset))
 #define ASM_LOAD16_REG_REG(as, reg_dest, reg_base) asm_thumb_ldrh_rlo_rlo_i5((as), (reg_dest), (reg_base), 0)
-#define ASM_LOAD16_REG_REG_OFFSET(as, reg_dest, reg_base, uint16_offset) asm_thumb_ldrh_reg_reg_i12_optimised((as), (reg_dest), (reg_base), (uint16_offset))
+#define ASM_LOAD16_REG_REG_OFFSET(as, reg_dest, reg_base, halfword_offset) asm_thumb_ldrh_reg_reg_offset((as), (reg_dest), (reg_base), (halfword_offset))
 #define ASM_LOAD32_REG_REG(as, reg_dest, reg_base) asm_thumb_ldr_rlo_rlo_i5((as), (reg_dest), (reg_base), 0)
+#define ASM_LOAD32_REG_REG_OFFSET(as, reg_dest, reg_base, word_offset) asm_thumb_ldr_reg_reg_offset((as), (reg_dest), (reg_base), (word_offset))
 
 #define ASM_STORE_REG_REG_OFFSET(as, reg_src, reg_base, word_offset) asm_thumb_str_rlo_rlo_i5((as), (reg_src), (reg_base), (word_offset))
 #define ASM_STORE8_REG_REG(as, reg_src, reg_base) asm_thumb_strb_rlo_rlo_i5((as), (reg_src), (reg_base), 0)

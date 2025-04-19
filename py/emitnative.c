@@ -1537,15 +1537,12 @@ static void emit_native_load_subscr(emit_t *emit) {
             switch (vtype_base) {
                 case VTYPE_PTR8: {
                     // pointer to 8-bit memory
-                    // TODO optimise to use thumb ldrb r1, [r2, r3]
+                    #if N_THUMB
+                    asm_thumb_ldrb_reg_reg_offset(emit->as, REG_RET, reg_base, index_value);
+                    #else
                     if (index_value != 0) {
                         // index is non-zero
-                        #if N_THUMB
-                        if (index_value > 0 && index_value < 32) {
-                            asm_thumb_ldrb_rlo_rlo_i5(emit->as, REG_RET, reg_base, index_value);
-                            break;
-                        }
-                        #elif N_RV32
+                        #if N_RV32
                         if (FIT_SIGNED(index_value, 12)) {
                             asm_rv32_opcode_lbu(emit->as, REG_RET, reg_base, index_value);
                             break;
@@ -1562,18 +1559,17 @@ static void emit_native_load_subscr(emit_t *emit) {
                         reg_base = reg_index;
                     }
                     ASM_LOAD8_REG_REG(emit->as, REG_RET, reg_base); // load from (base+index)
+                    #endif
                     break;
                 }
                 case VTYPE_PTR16: {
                     // pointer to 16-bit memory
+                    #if N_THUMB
+                    asm_thumb_ldrh_reg_reg_offset(emit->as, REG_RET, reg_base, index_value);
+                    #else
                     if (index_value != 0) {
                         // index is a non-zero immediate
-                        #if N_THUMB
-                        if (index_value > 0 && index_value < 32) {
-                            asm_thumb_ldrh_rlo_rlo_i5(emit->as, REG_RET, reg_base, index_value);
-                            break;
-                        }
-                        #elif N_RV32
+                        #if N_RV32
                         if (FIT_SIGNED(index_value, 11)) {
                             asm_rv32_opcode_lhu(emit->as, REG_RET, reg_base, index_value << 1);
                             break;
@@ -1590,18 +1586,17 @@ static void emit_native_load_subscr(emit_t *emit) {
                         reg_base = reg_index;
                     }
                     ASM_LOAD16_REG_REG(emit->as, REG_RET, reg_base); // load from (base+2*index)
+                    #endif
                     break;
                 }
                 case VTYPE_PTR32: {
                     // pointer to 32-bit memory
+                    #if N_THUMB
+                    asm_thumb_ldr_reg_reg_offset(emit->as, REG_RET, reg_base, index_value);
+                    #else
                     if (index_value != 0) {
                         // index is a non-zero immediate
-                        #if N_THUMB
-                        if (index_value > 0 && index_value < 32) {
-                            asm_thumb_ldr_rlo_rlo_i5(emit->as, REG_RET, reg_base, index_value);
-                            break;
-                        }
-                        #elif N_RV32
+                        #if N_RV32
                         if (FIT_SIGNED(index_value, 10)) {
                             asm_rv32_opcode_lw(emit->as, REG_RET, reg_base, index_value << 2);
                             break;
@@ -1618,6 +1613,7 @@ static void emit_native_load_subscr(emit_t *emit) {
                         reg_base = reg_index;
                     }
                     ASM_LOAD32_REG_REG(emit->as, REG_RET, reg_base); // load from (base+4*index)
+                    #endif
                     break;
                 }
                 default:

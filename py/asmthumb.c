@@ -40,6 +40,7 @@
 #define UNSIGNED_FIT5(x) ((uint32_t)(x) < 32)
 #define UNSIGNED_FIT7(x) ((uint32_t)(x) < 128)
 #define UNSIGNED_FIT8(x) (((x) & 0xffffff00) == 0)
+#define UNSIGNED_FIT12(x) (((x) & 0xfffff000) == 0)
 #define UNSIGNED_FIT16(x) (((x) & 0xffff0000) == 0)
 #define SIGNED_FIT8(x) (((x) & 0xffffff80) == 0) || (((x) & 0xffffff80) == 0xffffff80)
 #define SIGNED_FIT9(x) (((x) & 0xffffff00) == 0) || (((x) & 0xffffff00) == 0xffffff00)
@@ -55,8 +56,13 @@
 #define OP_LDR_W_HI(reg_base) (0xf8d0 | (reg_base))
 #define OP_LDR_W_LO(reg_dest, imm12) ((reg_dest) << 12 | (imm12))
 
+#define OP_LDRB_W_HI(reg_base) (0xf890 | (reg_base))
+#define OP_LDRB_W_LO(reg_dest, imm12) ((reg_dest) << 12 | (imm12))
+
 #define OP_LDRH_W_HI(reg_base) (0xf8b0 | (reg_base))
 #define OP_LDRH_W_LO(reg_dest, imm12) ((reg_dest) << 12 | (imm12))
+
+#define IS_REG_LO(reg) ((reg) < ASM_THUMB_REG_R8)
 
 static inline byte *asm_thumb_get_cur_to_write_bytes(asm_thumb_t *as, int n) {
     return mp_asm_base_get_cur_to_write_bytes(&as->base, n);
@@ -464,10 +470,11 @@ static void asm_thumb_add_reg_reg_offset(asm_thumb_t *as, uint reg_dest, uint re
     }
 }
 
-void asm_thumb_ldr_reg_reg_i12_optimised(asm_thumb_t *as, uint reg_dest, uint reg_base, uint word_offset) {
-    if (reg_dest < ASM_THUMB_REG_R8 && reg_base < ASM_THUMB_REG_R8 && UNSIGNED_FIT5(word_offset)) {
+void asm_thumb_ldr_reg_reg_offset(asm_thumb_t *as, uint reg_dest, uint reg_base, uint word_offset) {
+    assert((asm_thumb_allow_armv7m(as) || (!asm_thumb_allow_armv7m(as) && IS_REG_LO(reg_dest) && IS_REG_LO(reg_base))) && "Invalid armv6 register(s).");
+    if (UNSIGNED_FIT5(word_offset)) {
         asm_thumb_ldr_rlo_rlo_i5(as, reg_dest, reg_base, word_offset);
-    } else if (asm_thumb_allow_armv7m(as)) {
+    } else if (asm_thumb_allow_armv7m(as) && UNSIGNED_FIT12(word_offset)) {
         asm_thumb_ldr_reg_reg_i12(as, reg_dest, reg_base, word_offset);
     } else {
         asm_thumb_add_reg_reg_offset(as, reg_dest, reg_base, word_offset - 31, 2);
@@ -476,18 +483,36 @@ void asm_thumb_ldr_reg_reg_i12_optimised(asm_thumb_t *as, uint reg_dest, uint re
 }
 
 // ARMv7-M only
-static inline void asm_thumb_ldrh_reg_reg_i12(asm_thumb_t *as, uint reg_dest, uint reg_base, uint uint16_offset) {
-    asm_thumb_op32(as, OP_LDRH_W_HI(reg_base), OP_LDRH_W_LO(reg_dest, uint16_offset * 2));
+static inline void asm_thumb_ldrh_reg_reg_i12(asm_thumb_t *as, uint reg_dest, uint reg_base, uint halfword_offset) {
+    asm_thumb_op32(as, OP_LDRH_W_HI(reg_base), OP_LDRH_W_LO(reg_dest, halfword_offset * 2));
 }
 
-void asm_thumb_ldrh_reg_reg_i12_optimised(asm_thumb_t *as, uint reg_dest, uint reg_base, uint uint16_offset) {
-    if (reg_dest < ASM_THUMB_REG_R8 && reg_base < ASM_THUMB_REG_R8 && UNSIGNED_FIT5(uint16_offset)) {
-        asm_thumb_ldrh_rlo_rlo_i5(as, reg_dest, reg_base, uint16_offset);
-    } else if (asm_thumb_allow_armv7m(as)) {
-        asm_thumb_ldrh_reg_reg_i12(as, reg_dest, reg_base, uint16_offset);
+void asm_thumb_ldrh_reg_reg_offset(asm_thumb_t *as, uint reg_dest, uint reg_base, uint halfword_offset) {
+    assert((asm_thumb_allow_armv7m(as) || (!asm_thumb_allow_armv7m(as) && IS_REG_LO(reg_dest) && IS_REG_LO(reg_base))) && "Invalid armv6 register(s).");
+    if (UNSIGNED_FIT5(halfword_offset)) {
+        asm_thumb_ldrh_rlo_rlo_i5(as, reg_dest, reg_base, halfword_offset);
+    } else if (asm_thumb_allow_armv7m(as) && UNSIGNED_FIT12(halfword_offset)) {
+        asm_thumb_ldrh_reg_reg_i12(as, reg_dest, reg_base, halfword_offset);
     } else {
-        asm_thumb_add_reg_reg_offset(as, reg_dest, reg_base, uint16_offset - 31, 1);
+        asm_thumb_add_reg_reg_offset(as, reg_dest, reg_base, halfword_offset - 31, 1);
         asm_thumb_ldrh_rlo_rlo_i5(as, reg_dest, reg_dest, 31);
+    }
+}
+
+// ARMv7-M only
+static inline void asm_thumb_ldrb_reg_reg_i12(asm_thumb_t *as, uint reg_dest, uint reg_base, uint byte_offset) {
+    asm_thumb_op32(as, OP_LDRB_W_HI(reg_base), OP_LDRB_W_LO(reg_dest, byte_offset));
+}
+
+void asm_thumb_ldrb_reg_reg_offset(asm_thumb_t *as, uint reg_dest, uint reg_base, uint byte_offset) {
+    assert((asm_thumb_allow_armv7m(as) || (!asm_thumb_allow_armv7m(as) && IS_REG_LO(reg_dest) && IS_REG_LO(reg_base))) && "Invalid armv6 register(s).");
+    if (UNSIGNED_FIT5(byte_offset)) {
+        asm_thumb_ldrb_rlo_rlo_i5(as, reg_dest, reg_base, byte_offset);
+    } else if (asm_thumb_allow_armv7m(as) && UNSIGNED_FIT12(byte_offset)) {
+        asm_thumb_ldrb_reg_reg_i12(as, reg_dest, reg_base, byte_offset);
+    } else {
+        asm_thumb_add_reg_reg_offset(as, reg_dest, reg_base, byte_offset - 31, 0);
+        asm_thumb_ldrb_rlo_rlo_i5(as, reg_dest, reg_dest, 31);
     }
 }
 
@@ -569,7 +594,7 @@ void asm_thumb_b_rel12(asm_thumb_t *as, int rel) {
 
 void asm_thumb_bl_ind(asm_thumb_t *as, uint fun_id, uint reg_temp) {
     // Load ptr to function from table, indexed by fun_id, then call it
-    asm_thumb_ldr_reg_reg_i12_optimised(as, reg_temp, ASM_THUMB_REG_FUN_TABLE, fun_id);
+    asm_thumb_ldr_reg_reg_offset(as, reg_temp, ASM_THUMB_REG_FUN_TABLE, fun_id);
     asm_thumb_op16(as, OP_BLX(reg_temp));
 }
 

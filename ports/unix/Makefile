@@ -113,6 +113,15 @@ LDFLAGS_ARCH = -Wl,-Map=$@.map,--cref -Wl,--gc-sections
 endif
 LDFLAGS += $(LDFLAGS_MOD) $(LDFLAGS_ARCH) -lm $(LDFLAGS_EXTRA)
 
+ifeq ($(UNAME_S),FreeBSD)
+ifeq ($(firstword $(shell $(CC) --version)),gcc)
+GCC_VERSION = $(word 1, $(subst ., , $(shell $(CC) -dumpversion)))
+ifeq ($(shell test $(GCC_VERSION) -le 14; echo $$?), 0)
+CFLAGS += -Wno-float-conversion
+endif
+endif
+endif
+
 # Flags to link with pthread library
 LIBPTHREAD = -lpthread
 

@@ -36,13 +36,15 @@ MICROPY_HEAP_SIZE ?= 143360
 FROZEN_MANIFEST ?= "require('unittest'); freeze('test-frzmpy', ('frozen_asm_rv32.py', 'frozen_const.py', 'frozen_viper.py', 'native_frozen_align.py'))"
 endif
 
+MICROPY_HW_HARDFP ?= 0
+
 # include py core make definitions
 include $(TOP)/py/py.mk
 include $(TOP)/extmod/extmod.mk
 
 GIT_SUBMODULES += lib/berkeley-db-1.xx
 
-CFLAGS += -DMICROPY_HEAP_SIZE=$(MICROPY_HEAP_SIZE)
+CFLAGS += -DMICROPY_HEAP_SIZE=$(MICROPY_HEAP_SIZE) -DMICROPY_HW_HARDFP=$(MICROPY_HW_HARDFP)
 
 ################################################################################
 # ARM specific settings

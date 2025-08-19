@@ -34,18 +34,20 @@ def next_value() -> uint:
     return output & MASK
 
 
-@micropython.viper
-def set_index(dest: ptr8, i: int, val: uint):
-    saved = dest
-    dest[i] = val
-    assert int(dest) == int(saved)
-
-
 def get_index(src: ptr8, i: int):
     return src[i]
 
 
 try:
+
+    @micropython.viper
+    def set_index(dest: ptr8, i: int, val: uint):
+        saved = dest
+        dest[i] = val
+        assert int(dest) == int(saved)
+
+    buffer = bytearray(((1 << max(BIT_THRESHOLDS) + 1) // 1024) * 1024)
+
     for bit in BIT_THRESHOLDS:
         offset = (1 << bit) - (2 * SIZE)
         for index in range(0, 3 * SIZE, SIZE):
@@ -55,7 +57,6 @@ except MemoryError:
     raise SystemExit
 
 
-buffer = bytearray(((1 << max(BIT_THRESHOLDS) + 1) // 1024) * 1024)
 for bit in BIT_THRESHOLDS:
     print("---", bit)
     offset = (1 << bit) - (2 * SIZE)

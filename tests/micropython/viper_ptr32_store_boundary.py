@@ -8,11 +8,6 @@ def set{off}(dest: ptr32):
     assert int(saved) == int(dest)
 """
 
-GET_TEMPLATE = """
-set{off}(buffer)
-print(hex(get_index(buffer, {off})))
-"""
-
 BIT_THRESHOLDS = (5, 8, 11, 12)
 SIZE = 4
 MASK = (1 << (8 * SIZE)) - 1
@@ -66,7 +61,8 @@ for bit in BIT_THRESHOLDS:
     print("---", bit)
     offset = (1 << bit) - (2 * SIZE)
     for index in range(0, 3 * SIZE, SIZE):
-        exec(GET_TEMPLATE.format(off=(offset + index) // SIZE))
+        locals()["set{}".format((offset + index) // SIZE)](buffer)
+        print(hex(get_index(buffer, (offset + index) // SIZE)))
     for index in range(0, 3 * SIZE, SIZE):
         set_index(buffer, (offset + index) // SIZE, next_value())
         print(hex(get_index(buffer, (offset + index) // SIZE)))

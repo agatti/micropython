@@ -174,6 +174,8 @@ extern const struct _mp_print_t mp_stderr_print;
 #define MICROPY_DEBUG_PRINTER (&mp_stderr_print)
 #define MICROPY_ERROR_PRINTER (&mp_stderr_print)
 
+#define MICROPY_DEBUG_VERBOSE (0)
+
 // For the native emitter configure how to mark a region as executable.
 void mp_unix_alloc_exec(size_t min_size, void **ptr, size_t *size);
 void mp_unix_free_exec(void *ptr, size_t size);
@@ -194,6 +196,25 @@ static inline unsigned long mp_random_seed_init(void) {
 #ifdef __linux__
 // Can access physical memory using /dev/mem
 #define MICROPY_PLAT_DEV_MEM  (1)
+
+#define MICROPY_PY_GPIO                   (1)
+
+// If the GPIO ports and pins being used can not be removed from the system,
+// set this to 1 to make the binary smaller (and simplify the logic too).
+#define MICROPY_PY_GPIO_STATIC_ALLOCATION (1)
+
+// This capability is extracted into its own definition due to its dependence
+// on thread support.  Linux provides no built-in callback support on GPIO
+// line state change, so to get that to work we need a background thread that
+// epoll()s the monitored lines - which requires thread support being enabled.
+#define MICROPY_PY_GPIO_IRQ               (1)
+
+// Since GPIO line change events may be batched, this indicates how many
+// events can be reported at the same time per epoll() operation.
+// TODO: Make this dynamic instead?
+#define MICROPY_PY_GPIO_IRQ_QUEUE_SIZE    (16)
+
+#define MICROPY_PY_MACHINE_PIN_MAKE_NEW   mp_pin_make_new
 #endif
 
 #ifdef __ANDROID__
@@ -202,6 +223,11 @@ static inline unsigned long mp_random_seed_init(void) {
 // Bionic libc in Android 1.5 misses these 2 functions
 #define MP_NEED_LOG2 (1)
 #define nan(x) NAN
+#endif
+
+// Android is "Linux", but its GPIO support cannot be tested at the moment.
+#if MICROPY_PY_GPIO
+#error "GPIO support is not available on Android."
 #endif
 #endif
 
@@ -234,4 +260,8 @@ static inline unsigned long mp_random_seed_init(void) {
 
 #ifndef MICROPY_PY_BLUETOOTH_ENABLE_L2CAP_CHANNELS
 #define MICROPY_PY_BLUETOOTH_ENABLE_L2CAP_CHANNELS (MICROPY_BLUETOOTH_NIMBLE)
+#endif
+
+#ifndef MICROPY_PY_GPIO
+#define MICROPY_PY_GPIO     (0)
 #endif

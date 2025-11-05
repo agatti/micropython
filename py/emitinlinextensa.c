@@ -168,9 +168,65 @@ static int get_arg_label(emit_inline_asm_t *emit, const char *op, mp_parse_node_
     return 0;
 }
 
-#define RRR (0)
-#define RRI8 (1)
-#define RRI8_B (2)
+#define RRR_R0 (1 << 4)
+#define RRR_R1 (2 << 4)
+#define RRR_R2 (3 << 4)
+
+typedef struct _opcode_table_rrr_t {
+    qstr_short_t name;
+    uint32_t operands : 2;
+    uint32_t op2 : 4;
+    uint32_t op1 : 4;
+    uint32_t r : 6;
+    uint32_t s : 6;
+    uint32_t t : 6;
+    // 4 bits available here.
+} opcode_table_rrr_t;
+
+static const opcode_table_rrr_t OPCODE_TABLE_RRR[] = {
+    { MP_QSTR_abs_,   2,  6, 0, RRR_R0,      1, RRR_R1 },
+    { MP_QSTR_add,    3,  8, 0, RRR_R0, RRR_R1, RRR_R2 },
+    { MP_QSTR_addx2,  3,  9, 0, RRR_R0, RRR_R1, RRR_R2 },
+    { MP_QSTR_addx4,  3, 10, 0, RRR_R0, RRR_R1, RRR_R2 },
+    { MP_QSTR_addx8,  3, 11, 0, RRR_R0, RRR_R1, RRR_R2 },
+    { MP_QSTR_and_,   3,  1, 0, RRR_R0, RRR_R1, RRR_R2 },
+    { MP_QSTR_callx0, 1,  0, 0,      0, RRR_R0,     12 },
+    { MP_QSTR_jx,     1,  0, 0,      0, RRR_R0,     10 },
+    { MP_QSTR_mull,   3,  8, 2, RRR_R0, RRR_R1, RRR_R2 },
+    { MP_QSTR_neg,    2,  6, 0, RRR_R0,      0, RRR_R1 },
+    { MP_QSTR_nop,    0,  0, 0,      2,      0,     15 },
+    { MP_QSTR_nsa,    2,  4, 0,     14, RRR_R1, RRR_R0 },
+    { MP_QSTR_nsau,   2,  4, 0,     14, RRR_R1, RRR_R0 },
+    { MP_QSTR_sll,    2, 10, 1, RRR_R0, RRR_R1,      0 },
+    { MP_QSTR_sra,    2, 11, 1, RRR_R0,      0, RRR_R1 },
+    { MP_QSTR_src,    3,  8, 1, RRR_R0, RRR_R1, RRR_R1 },
+    { MP_QSTR_srl,    2,  9, 1, RRR_R0,      0, RRR_R1 },
+    { MP_QSTR_ssa8b,  1,  4, 0,      3, RRR_R0,      0 },
+    { MP_QSTR_ssa8l,  1,  4, 0,      2, RRR_R0,      0 },
+    { MP_QSTR_ssl,    1,  4, 0,      1, RRR_R0,      0 },
+    { MP_QSTR_ssr,    1,  4, 0,      0, RRR_R0,      0 },
+    { MP_QSTR_sub,    3, 12, 0, RRR_R0, RRR_R1, RRR_R2 },
+    { MP_QSTR_subx2,  3, 13, 0, RRR_R0, RRR_R1, RRR_R2 },
+    { MP_QSTR_subx4,  3, 14, 0, RRR_R0, RRR_R1, RRR_R2 },
+    { MP_QSTR_subx8,  3, 15, 0, RRR_R0, RRR_R1, RRR_R2 },
+    { MP_QSTR_xor,    3,  3, 0, RRR_R0, RRR_R1, RRR_R2 },
+
+    #if MICROPY_EMIT_INLINE_XTENSA_UNCOMMON_OPCODES
+    { MP_QSTR_dsync,  0,  0, 0,      2,      0,      3 },
+    { MP_QSTR_esync,  0,  0, 0,      2,      0,      2 },
+    { MP_QSTR_extw,   0,  0, 0,      2,      0,     13 },
+    { MP_QSTR_ill,    0,  0, 0,      0,      0,      0 },
+    { MP_QSTR_isync,  0,  0, 0,      2,      0,      0 },
+    { MP_QSTR_memw,   0,  0, 0,      2,      0,     12 },
+    { MP_QSTR_rer,    2,  4, 0,      6, RRR_R1, RRR_R0 },
+    // { MP_QSTR_ret,    0,  0, 0,      0,      0,      8 },
+    { MP_QSTR_rsync,  0,  0, 0,      2,      0,      1 },
+    { MP_QSTR_wer,    2,  4, 0,      7, RRR_R1, RRR_R0 },
+    #endif
+};
+
+#define RRI8 (0)
+#define RRI8_B (1)
 
 typedef struct _opcode_table_3arg_t {
     qstr_short_t name;
@@ -180,21 +236,6 @@ typedef struct _opcode_table_3arg_t {
 } opcode_table_3arg_t;
 
 static const opcode_table_3arg_t opcode_table_3arg[] = {
-    // arithmetic opcodes: reg, reg, reg
-    {MP_QSTR_and_, RRR, 0, 1},
-    {MP_QSTR_or_, RRR, 0, 2},
-    {MP_QSTR_xor, RRR, 0, 3},
-    {MP_QSTR_add, RRR, 0, 8},
-    {MP_QSTR_sub, RRR, 0, 12},
-    {MP_QSTR_mull, RRR, 2, 8},
-    {MP_QSTR_addx2, RRR, 0, 9},
-    {MP_QSTR_addx4, RRR, 0, 10},
-    {MP_QSTR_addx8, RRR, 0, 11},
-    {MP_QSTR_subx2, RRR, 0, 13},
-    {MP_QSTR_subx4, RRR, 0, 14},
-    {MP_QSTR_subx8, RRR, 0, 15},
-    {MP_QSTR_src, RRR, 1, 8},
-
     // load/store/addi opcodes: reg, reg, imm
     // upper nibble of type encodes the range of the immediate arg
     {MP_QSTR_l8ui, RRI8 | 0x10, 2, 0},
@@ -228,75 +269,50 @@ static const qstr_short_t BCCZ_OPCODES[] = {
     MP_QSTR_beqz_n, MP_QSTR_bnez_n
 };
 
-#if MICROPY_EMIT_INLINE_XTENSA_UNCOMMON_OPCODES
-typedef struct _single_opcode_t {
-    qstr_short_t name;
-    uint16_t value;
-} single_opcode_t;
-
-static const single_opcode_t NOARGS_OPCODES[] = {
-    {MP_QSTR_dsync, 0x2030},
-    {MP_QSTR_esync, 0x2020},
-    {MP_QSTR_extw,  0x20D0},
-    {MP_QSTR_ill,   0x0000},
-    {MP_QSTR_isync, 0x2000},
-    {MP_QSTR_memw,  0x20C0},
-    {MP_QSTR_rsync, 0x2010},
-};
-#endif
-
 static void emit_inline_xtensa_op(emit_inline_asm_t *emit, qstr op, mp_uint_t n_args, mp_parse_node_t *pn_args) {
     size_t op_len;
     const char *op_str = (const char *)qstr_data(op, &op_len);
+
+    for (size_t index = 0; index < MP_ARRAY_SIZE(OPCODE_TABLE_RRR); index++) {
+        const opcode_table_rrr_t *entry = &OPCODE_TABLE_RRR[index];
+        if (entry->name == op) {
+            if (n_args != entry->operands) {
+                emit_inline_xtensa_error_exc(emit, mp_obj_new_exception_msg_varg(&mp_type_SyntaxError, MP_ERROR_TEXT("Xtensa instruction '%s' requires %d arguments (%d given)"), op_str, entry->operands, n_args));
+                return;
+            }
+            mp_uint_t op24 = (entry->op2 << 20) | (entry->op1 << 16) | ((entry->r & 0x0F) << 12) | ((entry->s & 0x0F) << 8) | ((entry->t & 0x0F) << 4);
+            if (entry->r >= RRR_R0) {
+                op24 |= get_arg_reg(emit, op_str, pn_args[entry->r >> 4] - 1) << 12;
+            }
+            if (entry->s >= RRR_R0) {
+                op24 |= get_arg_reg(emit, op_str, pn_args[entry->s >> 4] - 1) << 8;
+            }
+            if (entry->t >= RRR_R0) {
+                op24 |= get_arg_reg(emit, op_str, pn_args[entry->t >> 4] - 1) << 4;
+            }
+            asm_xtensa_op24(&emit->as, op24);
+            return;
+        }
+    }
 
     if (n_args == 0) {
         if (op == MP_QSTR_ret_n || op == MP_QSTR_ret) {
             asm_xtensa_op_ret_n(&emit->as);
             return;
-        } else if (op == MP_QSTR_nop) {
-            asm_xtensa_op24(&emit->as, 0x20F0);
-            return;
         } else if (op == MP_QSTR_nop_n) {
             asm_xtensa_op16(&emit->as, 0xF03D);
             return;
         }
-        #if MICROPY_EMIT_INLINE_XTENSA_UNCOMMON_OPCODES
-        for (size_t index = 0; index < MP_ARRAY_SIZE(NOARGS_OPCODES); index++) {
-            const single_opcode_t *opcode = &NOARGS_OPCODES[index];
-            if (op == opcode->name) {
-                asm_xtensa_op24(&emit->as, opcode->value);
-                return;
-            }
-        }
-        #endif
 
         goto unknown_op;
 
     } else if (n_args == 1) {
-        if (op == MP_QSTR_callx0) {
-            uint r0 = get_arg_reg(emit, op_str, pn_args[0]);
-            asm_xtensa_op_callx0(&emit->as, r0);
-        } else if (op == MP_QSTR_j) {
+        if (op == MP_QSTR_j) {
             int label = get_arg_label(emit, op_str, pn_args[0]);
             asm_xtensa_j_label(&emit->as, label);
-        } else if (op == MP_QSTR_jx) {
-            uint r0 = get_arg_reg(emit, op_str, pn_args[0]);
-            asm_xtensa_op_jx(&emit->as, r0);
-        } else if (op == MP_QSTR_ssl) {
-            mp_uint_t r0 = get_arg_reg(emit, op_str, pn_args[0]);
-            asm_xtensa_op_ssl(&emit->as, r0);
-        } else if (op == MP_QSTR_ssr) {
-            mp_uint_t r0 = get_arg_reg(emit, op_str, pn_args[0]);
-            asm_xtensa_op_ssr(&emit->as, r0);
         } else if (op == MP_QSTR_ssai) {
             mp_uint_t sa = get_arg_i(emit, op_str, pn_args[0], 0, 31);
             asm_xtensa_op24(&emit->as, ASM_XTENSA_ENCODE_RRR(0, 0, 4, 4, sa & 0x0F, (sa >> 4) & 0x01));
-        } else if (op == MP_QSTR_ssa8b) {
-            mp_uint_t r0 = get_arg_reg(emit, op_str, pn_args[0]);
-            asm_xtensa_op24(&emit->as, ASM_XTENSA_ENCODE_RRR(0, 0, 4, 3, r0, 0));
-        } else if (op == MP_QSTR_ssa8l) {
-            mp_uint_t r0 = get_arg_reg(emit, op_str, pn_args[0]);
-            asm_xtensa_op24(&emit->as, ASM_XTENSA_ENCODE_RRR(0, 0, 4, 2, r0, 0));
         } else if (op == MP_QSTR_call0) {
             mp_uint_t label = get_arg_label(emit, op_str, pn_args[0]);
             asm_xtensa_call0(&emit->as, label);
@@ -328,27 +344,6 @@ static void emit_inline_xtensa_op(emit_inline_asm_t *emit, qstr op, mp_uint_t n_
             // for convenience we emit l32r if the integer doesn't fit in movi
             uint32_t imm = get_arg_i(emit, op_str, pn_args[1], 0, 0);
             asm_xtensa_mov_reg_i32(&emit->as, r0, imm);
-        } else if (op == MP_QSTR_abs_) {
-            mp_uint_t r1 = get_arg_reg(emit, op_str, pn_args[1]);
-            asm_xtensa_op24(&emit->as, ASM_XTENSA_ENCODE_RRR(0, 0, 6, r0, 1, r1));
-        } else if (op == MP_QSTR_neg) {
-            mp_uint_t r1 = get_arg_reg(emit, op_str, pn_args[1]);
-            asm_xtensa_op24(&emit->as, ASM_XTENSA_ENCODE_RRR(0, 0, 6, r0, 0, r1));
-        } else if (op == MP_QSTR_sll) {
-            mp_uint_t r1 = get_arg_reg(emit, op_str, pn_args[1]);
-            asm_xtensa_op24(&emit->as, ASM_XTENSA_ENCODE_RRR(0, 1, 10, r0, r1, 0));
-        } else if (op == MP_QSTR_sra) {
-            mp_uint_t r1 = get_arg_reg(emit, op_str, pn_args[1]);
-            asm_xtensa_op24(&emit->as, ASM_XTENSA_ENCODE_RRR(0, 1, 11, r0, 0, r1));
-        } else if (op == MP_QSTR_srl) {
-            mp_uint_t r1 = get_arg_reg(emit, op_str, pn_args[1]);
-            asm_xtensa_op24(&emit->as, ASM_XTENSA_ENCODE_RRR(0, 1, 9, r0, 0, r1));
-        } else if (op == MP_QSTR_nsa) {
-            mp_uint_t r1 = get_arg_reg(emit, op_str, pn_args[1]);
-            asm_xtensa_op24(&emit->as, ASM_XTENSA_ENCODE_RRR(0, 0, 4, 14, r1, r0));
-        } else if (op == MP_QSTR_nsau) {
-            mp_uint_t r1 = get_arg_reg(emit, op_str, pn_args[1]);
-            asm_xtensa_op24(&emit->as, ASM_XTENSA_ENCODE_RRR(0, 0, 4, 15, r1, r0));
         } else if (op == MP_QSTR_l32r) {
             mp_uint_t label = get_arg_label(emit, op_str, pn_args[1]);
             asm_xtensa_l32r(&emit->as, r0, label);
@@ -385,10 +380,7 @@ static void emit_inline_xtensa_op(emit_inline_asm_t *emit, qstr op, mp_uint_t n_
             if (op == o->name) {
                 uint r0 = get_arg_reg(emit, op_str, pn_args[0]);
                 uint r1 = get_arg_reg(emit, op_str, pn_args[1]);
-                if (o->type == RRR) {
-                    uint r2 = get_arg_reg(emit, op_str, pn_args[2]);
-                    asm_xtensa_op24(&emit->as, ASM_XTENSA_ENCODE_RRR(0, o->a0, o->a1, r0, r1, r2));
-                } else if (o->type == RRI8_B) {
+                if (o->type == RRI8_B) {
                     int label = get_arg_label(emit, op_str, pn_args[2]);
                     asm_xtensa_bcc_reg_reg_label(&emit->as, o->a0, r0, r1, label);
                 } else {

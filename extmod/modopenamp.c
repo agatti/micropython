@@ -81,9 +81,10 @@
 #define VRING_BUFF_SIZE         (METAL_SHM_SIZE - 0x2000)
 
 #if MICROPY_PY_OPENAMP_HOST
-static const char openamp_trace_buf[128];
+#ifndef MICROPY_PY_OPENAMP_TRACE_BUF
+static char openamp_trace_buf[MICROPY_PY_OPENAMP_TRACE_BUF_LEN];
 #define MICROPY_PY_OPENAMP_TRACE_BUF       ((uint32_t)openamp_trace_buf)
-#define MICROPY_PY_OPENAMP_TRACE_BUF_LEN   sizeof(MICROPY_PY_OPENAMP_TRACE_BUF)
+#endif // MICROPY_PY_OPENAMP_TRACE_BUF
 #endif // MICROPY_PY_OPENAMP_HOST
 
 #endif // MICROPY_PY_OPENAMP_RSC_TABLE_ENABLE

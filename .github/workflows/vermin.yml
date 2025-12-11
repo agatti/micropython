@@ -1,0 +1,44 @@
+name: Python code minimum supported version check with vermin
+
+on:
+  push:
+    paths:
+      - '!tests/**/*.py'
+      - '**/*.py'
+  pull_request:
+    paths:
+      - '!tests/**/*.py'
+      - '**/*.py'
+
+jobs:
+  vermin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Collect changed files list
+        id: collect_changes_pull
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          echo "changed=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)" >> $GITHUB_OUTPUT
+      - name: Collect changed files list
+        id: collect_changes_push
+        if: github.event_name == 'push'
+        run: |
+          START=$(jq --raw-output .commits[0].id "$GITHUB_EVENT_PATH")
+          END=$(jq --raw-output .commits[-1].id "$GITHUB_EVENT_PATH")
+          FILES=$(git diff-tree --no-commit-id --name-only -r "$START" "$END")
+          echo "changed=$FILES" >> $GITHUB_OUTPUT
+      # vermin version should be kept in sync with .pre-commit-config.yaml
+      - run: pipx install vermin==1.8.0
+      - name: Run vermin
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ];
+          then
+            FILES_LIST="${{ steps.collect_changes_pull.output.changed }}"
+          else
+            FILES_LIST="${{ steps.collect_changes_push.output.changed }}"
+          fi
+          vermin --target=3.8- --no-parse-comments --no-tips --violations --backport argparse --format=github $FILES_LIST

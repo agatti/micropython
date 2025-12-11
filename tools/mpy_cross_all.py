@@ -3,6 +3,8 @@ import argparse
 import os
 import os.path
 
+# HELLO
+
 argparser = argparse.ArgumentParser(description="Compile all .py files to .mpy recursively")
 argparser.add_argument("-o", "--out", help="output directory (default: input dir)")
 argparser.add_argument("--target", help="select MicroPython target config")

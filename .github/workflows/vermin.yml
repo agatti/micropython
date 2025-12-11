@@ -1,0 +1,31 @@
+name: Python code minimum supported version check with vermin
+
+on:
+  push:
+    paths:
+      - '!tests/**/*.py'
+      - '**/*.py'
+  pull_request:
+    paths:
+      - '!tests/**/*.py'
+      - '**/*.py'
+
+jobs:
+  vermin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      # vermin version should be kept in sync with .pre-commit-config.yaml
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+          check-latest: true
+          pip-install: vermin==1.8.0
+      - name: Collect changed files list
+        id: collect_changes
+        run: |
+          echo "changed=$(git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha || github.event.before }}...${{ github.event.pull_request.head.sha || github.event.after || github.event.sha }} | xargs)" >> $GITHUB_OUTPUT
+      - name: Run vermin
+        run: |
+          FILES_LIST="${{ steps.collect_changes.output.changed }}"
+          [[ ! -z "$FILES_LIST" ]] && vermin --target=3.8- --no-parse-comments --no-tips --violations --backport argparse --format=github $FILES_LIST

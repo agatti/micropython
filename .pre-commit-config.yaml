@@ -25,3 +25,11 @@ repos:
         name: Spellcheck for changed files (codespell)
         additional_dependencies:
           - tomli
+  - repo: https://github.com/netromdk/vermin
+    # Version should be kept in sync with .github/workflows/vermin.yml
+    rev: v1.8.0
+    hooks:
+      - id: vermin
+        exclude: tests/.*/.*
+        args: ["--no-tips", "--no-parse-comments", "--backport argparse", "--target=3.8-", "--violations"]
+        stages: [pre-commit]

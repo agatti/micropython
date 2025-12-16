@@ -274,6 +274,7 @@ tests_requiring_float = (
     "extmod/uctypes_le_float.py",
     "extmod/uctypes_native_float.py",
     "extmod/uctypes_sizeof_float.py",
+    "micropython/const_float.py",
     "misc/rge_sm.py",
     "ports/unix/ffi_float.py",
     "ports/unix/ffi_float2.py",

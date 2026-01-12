@@ -42,9 +42,10 @@
 
 #define MICROPY_ALLOC_PATH_MAX      (260) // see minwindef.h for msvc or limits.h for mingw
 #define MICROPY_PERSISTENT_CODE_LOAD (1)
-#define MICROPY_EMIT_X64            (0)
+#define MICROPY_EMIT_X64            (1)
 #define MICROPY_EMIT_THUMB          (0)
 #define MICROPY_EMIT_INLINE_THUMB   (0)
+#define MICROPY_EMIT_WINDOWS_CALL_CONVENTION (1)
 #define MICROPY_COMP_MODULE_CONST   (1)
 #define MICROPY_COMP_TRIPLE_TUPLE_ASSIGN (1)
 #define MICROPY_COMP_RETURN_IF_EXPR (1)
@@ -212,6 +213,13 @@ typedef long mp_off_t;
 
 #define MICROPY_MPHALPORT_H         "windows_mphal.h"
 
+void mp_windows_alloc_exec(size_t min_size, void **ptr, size_t *size);
+void mp_windows_mark_exec(void *ptr, size_t size);
+void mp_windows_free_exec(void *ptr, size_t size);
+#define MP_PLAT_ALLOC_EXEC(min_size, ptr, size) mp_windows_alloc_exec(min_size, ptr, size)
+#define MP_PLAT_MARK_EXEC(ptr, size) mp_windows_mark_exec(ptr, size)
+#define MP_PLAT_FREE_EXEC(ptr, size) mp_windows_free_exec(ptr, size)
+
 // We need to provide a declaration/definition of alloca()
 #include <malloc.h>
 
@@ -281,7 +289,6 @@ typedef __int64 ssize_t;
 typedef int ssize_t;
 #endif
 typedef mp_off_t off_t;
-
 
 // Put static/global variables in sections with a known name
 // This used to be required for GC, not the case anymore but keep it as it makes the map file easier to inspect

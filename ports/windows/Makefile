@@ -69,6 +69,7 @@ SRC_C = \
 	realpath.c \
 	init.c \
 	fmode.c \
+	alloc.c \
 	$(wildcard $(VARIANT_DIR)/*.c)
 
 SHARED_SRC_C += $(addprefix shared/,\

@@ -39,6 +39,7 @@
 #endif
 #endif
 
+#define MICROPY_EMIT_WINDOWS_CALL_CONVENTION (1)
 #define MICROPY_EMIT_X64            (1)
 #define MICROPY_EMIT_X86            (1)
 #define MICROPY_EMIT_THUMB          (1)

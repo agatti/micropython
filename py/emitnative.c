@@ -769,6 +769,10 @@ static bool emit_native_end_pass(emit_t *emit) {
             emit->prelude_offset,
             #endif
             emit->scope->scope_flags, 0, 0);
+
+        #ifdef MP_PLAT_MARK_EXEC
+        MP_PLAT_MARK_EXEC((void *)emit->as->base.code_base, (size_t)emit->as->base.code_size);
+        #endif
     }
 
     return true;

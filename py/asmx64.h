@@ -36,6 +36,14 @@
 //  - stack must be aligned on a 16-byte boundary before all calls
 //  - RAX, RCX, RDX, RSI, RDI, R08, R09, R10, R11 are caller-save
 //  - RBX, RBP, R12, R13, R14, R15 are callee-save
+//
+// However, on Windows it is as such:
+//  - first four args in: RCX, RDX, R08, R09
+//  - other arguments on the stack
+//  - return value in RAX
+//  - stack must be aligned on a 16-byte boundary before all calls
+//  - RAX, RCX, RDX, R08, R09, R10, R11 are caller-save
+//  - RBX, RSI, RDI, RBP, R12, R13, R14, R15 are callee-save
 
 // In the functions below, argument order follows x86 docs and generally
 // the destination is the first argument.
@@ -134,11 +142,30 @@ void asm_x64_call_ind(asm_x64_t *as, size_t fun_id, int temp_r32);
 #define ASM_WORD_SIZE (8)
 
 #define REG_RET ASM_X64_REG_RAX
+
+#if MICROPY_EMIT_WINDOWS_CALL_CONVENTION
+
+#define REG_ARG_1 ASM_X64_REG_RCX
+#define REG_ARG_2 ASM_X64_REG_RDX
+#define REG_ARG_3 ASM_X64_REG_R08
+#define REG_ARG_4 ASM_X64_REG_R09
+
+// caller-save
+#define REG_TEMP0 ASM_X64_REG_RAX
+#define REG_TEMP1 ASM_X64_REG_R10
+#define REG_TEMP2 ASM_X64_REG_R11
+
+// callee-save
+#define REG_LOCAL_1 ASM_X64_REG_RBX
+#define REG_LOCAL_2 ASM_X64_REG_R12
+#define REG_LOCAL_3 ASM_X64_REG_R13
+
+#else
+
 #define REG_ARG_1 ASM_X64_REG_RDI
 #define REG_ARG_2 ASM_X64_REG_RSI
 #define REG_ARG_3 ASM_X64_REG_RDX
 #define REG_ARG_4 ASM_X64_REG_RCX
-#define REG_ARG_5 ASM_X64_REG_R08
 
 // caller-save
 #define REG_TEMP0 ASM_X64_REG_RAX
@@ -149,6 +176,9 @@ void asm_x64_call_ind(asm_x64_t *as, size_t fun_id, int temp_r32);
 #define REG_LOCAL_1 ASM_X64_REG_RBX
 #define REG_LOCAL_2 ASM_X64_REG_R12
 #define REG_LOCAL_3 ASM_X64_REG_R13
+
+#endif
+
 #define REG_LOCAL_NUM (3)
 
 // Holds a pointer to mp_fun_table

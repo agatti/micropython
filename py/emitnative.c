@@ -2653,7 +2653,7 @@ static void emit_native_binary_op(emit_t *emit, mp_binary_op_t op) {
         }
         emit_post_push_reg(emit, VTYPE_PYOBJ, REG_RET);
     } else {
-        adjust_stack(emit, -1);
+        adjust_stack(emit, 1);
         EMIT_NATIVE_VIPER_TYPE_ERROR(emit,
             MP_ERROR_TEXT("can't do binary op between '%q' and '%q'"),
             vtype_to_qstr(vtype_lhs), vtype_to_qstr(vtype_rhs));

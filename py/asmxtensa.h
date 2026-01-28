@@ -138,6 +138,12 @@ enum {
 #define XTENSA_ENCODE_CORE(version) (((version) - 2) & 0x07)
 #define XTENSA_DECODE_CORE(raw)     (((raw) & 0x07) + 2)
 
+typedef struct _asm_xtensa_backend_options_t {
+    // 0..2 : core version - 2 (eg. LX3 = 1)
+    // 3..7 : reserved
+    uint8_t options;
+} asm_xtensa_backend_options_t;
+
 void asm_xtensa_end_pass(asm_xtensa_t *as);
 
 void asm_xtensa_entry(asm_xtensa_t *as, int num_locals);

@@ -120,6 +120,24 @@ typedef struct _asm_xtensa_t {
     uint32_t stack_adjust;
 } asm_xtensa_t;
 
+#define MICROPY_XTENSA_FLAGS \
+    (MICROPY_EMIT_INLINE_XTENSA_LX3 ? XTENSA_CORE_LX3 : \
+    (MICROPY_EMIT_INLINE_XTENSA_LX6 ? XTENSA_CORE_LX4 : \
+    (MICROPY_EMIT_INLINE_XTENSA_LX7 ? XTENSA_CORE_LX7 : 0)))
+
+// CPU opcode level
+enum {
+    XTENSA_CORE_LX3 = 3,
+    XTENSA_CORE_LX4,
+    XTENSA_CORE_LX5,
+    XTENSA_CORE_LX6,
+    XTENSA_CORE_LX7,
+    XTENSA_CORE_LX8,
+};
+
+#define XTENSA_ENCODE_CORE(version) (((version) - 2) & 0x07)
+#define XTENSA_DECODE_CORE(raw)     (((raw) & 0x07) + 2)
+
 void asm_xtensa_end_pass(asm_xtensa_t *as);
 
 void asm_xtensa_entry(asm_xtensa_t *as, int num_locals);

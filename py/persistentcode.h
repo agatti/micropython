@@ -75,6 +75,27 @@
         #else
             #define MPY_FEATURE_ARCH (MP_NATIVE_ARCH_XTENSA)
         #endif
+        #if XCHAL_HW_REL_LX3
+            #define MPY_XTENSA_CORE_VERSION (3)
+        #endif
+        #if XCHAL_HW_REL_LX4
+            #define MPY_XTENSA_CORE_VERSION (4)
+        #endif
+        #if XCHAL_HW_REL_LX5
+            #define MPY_XTENSA_CORE_VERSION (5)
+        #endif
+        #if XCHAL_HW_REL_LX6
+            #define MPY_XTENSA_CORE_VERSION (6)
+        #endif
+        #if XCHAL_HW_REL_LX7
+            #define MPY_XTENSA_CORE_VERSION (7)
+        #endif
+        #if XCHAL_HW_REL_LX8
+            #define MPY_XTENSA_CORE_VERSION (8)
+        #endif
+        #ifndef MPY_XTENSA_CORE_VERSION
+            #error "Unsupported Xtensa LX core version"
+        #endif
     #elif defined(__riscv)
         #if __riscv_xlen == 32
             #define MPY_FEATURE_ARCH (MP_NATIVE_ARCH_RV32IMC)

@@ -50,6 +50,18 @@
 #endif
 #else
 #define MICROPY_EMIT_XTENSAWIN              (1)
+// Predefine the correct options set for the inline assembler.
+#define MICROPY_EMIT_INLINE_XTENSA_WINDOWED (1)
+#if CONFIG_IDF_TARGET_ESP32
+#define MICROPY_EMIT_INLINE_XTENSA_LX6      (1)
+#elif CONFIG_IDF_TARGET_ESP32S2
+#define MICROPY_EMIT_INLINE_XTENSA_LX6      (1)
+#elif CONFIG_IDF_TARGET_ESP32S3
+#define MICROPY_EMIT_INLINE_XTENSA_LX7      (1)
+#else
+// Default to the lowest common ESP32 series denominator.
+#define MICROPY_EMIT_INLINE_XTENSA_LX6      (1)
+#endif
 #endif
 
 // optimisations

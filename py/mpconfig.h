@@ -492,19 +492,11 @@ typedef uint64_t mp_uint_t;
 #define MICROPY_EMIT_INLINE_XTENSA (0)
 #endif
 
-// Whether to allow inline Xtensa code to support up to LX3 cores
-#ifndef MICROPY_EMIT_INLINE_XTENSA_LX3
-#define MICROPY_EMIT_INLINE_XTENSA_LX3 (0)
-#endif
-
-// Whether to allow inline Xtensa code to support up to LX6 cores
-#ifndef MICROPY_EMIT_INLINE_XTENSA_LX6
-#define MICROPY_EMIT_INLINE_XTENSA_LX6 (0)
-#endif
-
-// Whether to allow inline Xtensa code to support up to LX7 cores
-#ifndef MICROPY_EMIT_INLINE_XTENSA_LX7
-#define MICROPY_EMIT_INLINE_XTENSA_LX7 (0)
+// The minimum Xtensa core version to emit inline assembler opcodes for.
+// 0 indicates that the target version is to be figured out according to
+// what the Xtensa HAL defines.
+#ifndef MICROPY_EMIT_INLINE_XTENSA_TARGET
+#define MICROPY_EMIT_INLINE_XTENSA_TARGET (0)
 #endif
 
 // Whether to emit inline Xtensa code for a windowed-capable core

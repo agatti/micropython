@@ -292,6 +292,10 @@ struct _emit_t {
     ASM_MOV_LOCAL_REG(as, local_num, reg_temp)
 #endif
 
+#ifndef ASM_COMMENT
+#define ASM_COMMENT(as, fmt, ...)
+#endif
+
 static void emit_load_reg_with_object(emit_t *emit, int reg, mp_obj_t obj);
 static void emit_native_global_exc_entry(emit_t *emit);
 static void emit_native_global_exc_exit(emit_t *emit);
@@ -381,6 +385,47 @@ static void emit_native_mov_reg_qstr_obj(emit_t *emit, int reg_dest, qstr qst) {
         ASM_MOV_REG_IMM((emit)->as, (reg_temp), (imm)); \
         emit_native_mov_state_reg((emit), (local_num), (reg_temp)); \
     } while (false)
+
+static void emit_native_dump_header_metadata(emit_t *emit) {
+    if (emit->pass != MP_PASS_EMIT) {
+        return;
+    }
+    vstr_t *scope = vstr_new(128);
+    if (emit->scope->scope_flags & MP_SCOPE_FLAG_DEFKWARGS) {
+        vstr_add_str(scope, "defkwargs,");
+    }
+    if (emit->scope->scope_flags & MP_SCOPE_FLAG_GENERATOR) {
+        vstr_add_str(scope, "generator,");
+    }
+    if (emit->scope->scope_flags & MP_SCOPE_FLAG_HASCONSTS) {
+        vstr_add_str(scope, "hasconsts,");
+    }
+    if (emit->scope->scope_flags & MP_SCOPE_FLAG_REFGLOBALS) {
+        vstr_add_str(scope, "refglobals,");
+    }
+    if (emit->scope->scope_flags & MP_SCOPE_FLAG_VARARGS) {
+        vstr_add_str(scope, "varargs,");
+    }
+    if (emit->scope->scope_flags & MP_SCOPE_FLAG_VARKEYWORDS) {
+        vstr_add_str(scope, "varkeywords,");
+    }
+    if (vstr_len(scope) > 0) {
+        vstr_cut_tail_bytes(scope, 1);
+        ASM_COMMENT(emit->as, "metadata: function_scope=%s\n",
+            vstr_null_terminated_str(scope));
+    }
+    vstr_free(scope);
+
+    if (emit->scope->num_pos_args > 0) {
+        ASM_COMMENT(emit->as, "metadata: positional_args=%d\n", emit->scope->num_pos_args);
+    }
+    if (emit->scope->num_kwonly_args > 0) {
+        ASM_COMMENT(emit->as, "metadata: keyword_args=%d\n", emit->scope->num_kwonly_args);
+    }
+    if (emit->scope->num_def_pos_args) {
+        ASM_COMMENT(emit->as, "metadata: default_positional_args=%d\n", emit->scope->num_def_pos_args);
+    }
+}
 
 static void emit_native_start_pass(emit_t *emit, pass_kind_t pass, scope_t *scope) {
     DEBUG_printf("start_pass(pass=%u, scope=%p)\n", pass, scope);
@@ -501,6 +546,7 @@ static void emit_native_start_pass(emit_t *emit, pass_kind_t pass, scope_t *scop
 
         // Entry to function
         ASM_ENTRY(emit->as, emit->stack_start + emit->n_state - num_locals_in_regs, qualified_name);
+        emit_native_dump_header_metadata(emit);
 
         #if N_X86
         asm_x86_mov_arg_to_r32(emit->as, 0, REG_PARENT_ARG_1);
@@ -572,6 +618,7 @@ static void emit_native_start_pass(emit_t *emit, pass_kind_t pass, scope_t *scop
         if (emit->scope->scope_flags & MP_SCOPE_FLAG_GENERATOR) {
             mp_asm_base_data(&emit->as->base, ASM_WORD_SIZE, (uintptr_t)emit->start_offset);
             ASM_ENTRY(emit->as, emit->code_state_start, qualified_name);
+            emit_native_dump_header_metadata(emit);
 
             // Reset the state size for the state pointed to by REG_GENERATOR_STATE
             emit->code_state_start = 0;
@@ -604,6 +651,7 @@ static void emit_native_start_pass(emit_t *emit, pass_kind_t pass, scope_t *scop
 
             // Allocate space on C-stack for code_state structure, which includes state
             ASM_ENTRY(emit->as, emit->stack_start + emit->n_state, qualified_name);
+            emit_native_dump_header_metadata(emit);
 
             // Prepare incoming arguments for call to mp_setup_code_state
 
@@ -1120,6 +1168,7 @@ static void emit_native_push_exc_stack(emit_t *emit, uint label, bool is_finally
     e->is_active = true;
 
     ASM_MOV_REG_PCREL(emit->as, REG_RET, label);
+    ASM_COMMENT(emit->as, "metadata: function_exception_handler_local=%d\n", LOCAL_IDX_EXC_HANDLER_PC(emit));
     ASM_MOV_LOCAL_REG(emit->as, LOCAL_IDX_EXC_HANDLER_PC(emit), REG_RET);
 }
 
@@ -1146,6 +1195,7 @@ static void emit_native_leave_exc_stack(emit_t *emit, bool start_of_handler) {
         // Found new active handler, get its PC
         ASM_MOV_REG_PCREL(emit->as, REG_RET, e->label);
     }
+    ASM_COMMENT(emit->as, "metadata: function_exception_handler_local=%d\n", LOCAL_IDX_EXC_HANDLER_PC(emit));
     ASM_MOV_LOCAL_REG(emit->as, LOCAL_IDX_EXC_HANDLER_PC(emit), REG_RET);
 }
 
@@ -1231,6 +1281,7 @@ static void emit_native_global_exc_entry(emit_t *emit) {
             // Wrap everything in an nlr context
             ASM_MOV_REG_LOCAL_ADDR(emit->as, REG_ARG_1, 0);
             emit_call(emit, MP_F_NLR_PUSH);
+            ASM_COMMENT(emit->as, "metadata: setjmp_call\n");
             #if N_NLR_SETJMP
             ASM_MOV_REG_LOCAL_ADDR(emit->as, REG_ARG_1, 2);
             emit_call(emit, MP_F_SETJMP);
@@ -1251,6 +1302,7 @@ static void emit_native_global_exc_entry(emit_t *emit) {
             emit_native_label_assign(emit, nlr_label);
             ASM_MOV_REG_LOCAL_ADDR(emit->as, REG_ARG_1, 0);
             emit_call(emit, MP_F_NLR_PUSH);
+            ASM_COMMENT(emit->as, "metadata: setjmp_call\n");
             #if N_NLR_SETJMP
             ASM_MOV_REG_LOCAL_ADDR(emit->as, REG_ARG_1, 2);
             emit_call(emit, MP_F_SETJMP);
@@ -1258,11 +1310,13 @@ static void emit_native_global_exc_entry(emit_t *emit) {
             ASM_JUMP_IF_REG_NONZERO(emit->as, REG_RET, global_except_label, true);
 
             // Clear PC of current code block, and jump there to resume execution
+            ASM_COMMENT(emit->as, "metadata: function_exception_handler_local=%d\n", LOCAL_IDX_EXC_HANDLER_PC(emit));
             ASM_MOV_LOCAL_MP_OBJ_NULL(emit->as, LOCAL_IDX_EXC_HANDLER_PC(emit), REG_ZERO);
             ASM_JUMP_REG(emit->as, REG_LOCAL_1);
 
             // Global exception handler: check for valid exception handler
             emit_native_label_assign(emit, global_except_label);
+            ASM_COMMENT(emit->as, "metadata: function_exception_handler_local=%d\n", LOCAL_IDX_EXC_HANDLER_PC(emit));
             ASM_MOV_REG_LOCAL(emit->as, REG_LOCAL_1, LOCAL_IDX_EXC_HANDLER_PC(emit));
             ASM_JUMP_IF_REG_NONZERO(emit->as, REG_LOCAL_1, nlr_label, false);
         }
@@ -1297,6 +1351,8 @@ static void emit_native_global_exc_entry(emit_t *emit) {
             emit->start_offset = mp_asm_base_get_code_pos(&emit->as->base);
 
             // This is the first entry of the generator
+
+            ASM_COMMENT(emit->as, "metadata: generator_entry_point\n");
 
             // Check LOCAL_IDX_THROW_VAL for any injected value
             ASM_MOV_REG_LOCAL(emit->as, REG_ARG_1, LOCAL_IDX_THROW_VAL(emit));
@@ -2089,6 +2145,7 @@ static void emit_native_unwind_jump(emit_t *emit, mp_uint_t label, mp_uint_t exc
             } else {
                 ASM_MOV_REG_PCREL(emit->as, REG_RET, e->label);
             }
+            ASM_COMMENT(emit->as, "metadata: function_exception_handler_local=%d\n", LOCAL_IDX_EXC_HANDLER_PC(emit));
             ASM_MOV_LOCAL_REG(emit->as, LOCAL_IDX_EXC_HANDLER_PC(emit), REG_RET);
         } else {
             // Last finally should do our jump for us
@@ -2997,6 +3054,7 @@ static void emit_native_yield(emit_t *emit, int kind) {
             if (e->is_active) {
                 // Found active handler, get its PC
                 ASM_MOV_REG_PCREL(emit->as, REG_RET, e->label);
+                ASM_COMMENT(emit->as, "metadata: function_exception_handler_local=%d\n", LOCAL_IDX_EXC_HANDLER_PC(emit));
                 ASM_MOV_LOCAL_REG(emit->as, LOCAL_IDX_EXC_HANDLER_PC(emit), REG_RET);
                 break;
             }

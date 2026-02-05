@@ -20,6 +20,14 @@
         } \
     } while (0)
 
+#define ASM_COMMENT(as, fmt, ...) \
+    do { \
+        if (as->base.pass == MP_ASM_PASS_EMIT) { \
+            mp_printf(MICROPY_EMIT_NATIVE_DEBUG_PRINTER, "    ; "); \
+            mp_printf(MICROPY_EMIT_NATIVE_DEBUG_PRINTER, fmt,##__VA_ARGS__); \
+        } \
+    } while (0)
+
 enum {
     ASM_DEBUG_REG_R00,
     ASM_DEBUG_REG_R01,

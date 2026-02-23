@@ -15,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: ${{ github.event_name == 'pull_request' && 2 || 0 }}
       # vermin version should be kept in sync with .pre-commit-config.yaml
       - uses: actions/setup-python@v6
         with:
@@ -22,10 +24,14 @@ jobs:
           check-latest: true
           pip-install: vermin==1.8.0
       - name: Collect changed files list
-        id: collect_changes
+        id: collect
         run: |
-          echo "changed=$(git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha || github.event.before }}...${{ github.event.pull_request.head.sha || github.event.after || github.event.sha }} | xargs)" >> $GITHUB_OUTPUT
+          if ${{ github.event_name == 'pull_request' }}; then
+              echo "changed=$(git diff --name-only -r HEAD^1 HEAD | xargs)" >> $GITHUB_OUTPUT
+          else
+              echo "changed=$(git diff --name-only ${{ github.event.before }} ${{ github.event.after }} | xargs)" >> $GITHUB_OUTPUT
+          fi
       - name: Run vermin
         run: |
-          FILES_LIST="${{ steps.collect_changes.output.changed }}"
+          FILES_LIST="${{ steps.collect.output.changed }}"
           [[ ! -z "$FILES_LIST" ]] && vermin --target=3.8- --no-parse-comments --no-tips --violations --backport argparse --format=github $FILES_LIST

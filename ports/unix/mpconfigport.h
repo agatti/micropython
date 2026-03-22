@@ -104,6 +104,11 @@ typedef long mp_off_t;
 #define MICROPY_GCREGS_SETJMP (1)
 #endif
 
+// Enable the `exit()` builtin.
+#ifndef MICROPY_PY_BUILTINS_EXIT
+#define MICROPY_PY_BUILTINS_EXIT    (1)
+#endif
+
 // Enable the VFS, and enable the posix "filesystem".
 #define MICROPY_ENABLE_FINALISER    (1)
 #define MICROPY_VFS                 (1)

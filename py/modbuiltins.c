@@ -603,6 +603,17 @@ MP_DEFINE_CONST_FUN_OBJ_1(mp_builtin_len_obj, mp_obj_len);
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mp_builtin___template___obj, 1, MP_OBJ_FUN_ARGS_MAX, mp_obj_new_template);
 #endif
 
+#if MICROPY_PY_BUILTINS_EXIT
+static mp_obj_t mp_builtin_exit(size_t n_args, const mp_obj_t *args) {
+    if (n_args == 0) {
+        mp_raise_type(&mp_type_SystemExit);
+    } else {
+        mp_raise_type_arg(&mp_type_SystemExit, args[0]);
+    }
+}
+MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mp_builtin_exit_obj, 0, 1, mp_builtin_exit);
+#endif
+
 static const mp_rom_map_elem_t mp_module_builtins_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_builtins) },
 
@@ -692,6 +703,9 @@ static const mp_rom_map_elem_t mp_module_builtins_globals_table[] = {
     #endif
     #if MICROPY_PY_BUILTINS_EXECFILE
     { MP_ROM_QSTR(MP_QSTR_execfile), MP_ROM_PTR(&mp_builtin_execfile_obj) },
+    #endif
+    #if MICROPY_PY_BUILTINS_EXIT
+    { MP_ROM_QSTR(MP_QSTR_exit), MP_ROM_PTR(&mp_builtin_exit_obj) },
     #endif
     { MP_ROM_QSTR(MP_QSTR_getattr), MP_ROM_PTR(&mp_builtin_getattr_obj) },
     { MP_ROM_QSTR(MP_QSTR_setattr), MP_ROM_PTR(&mp_builtin_setattr_obj) },

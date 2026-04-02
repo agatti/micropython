@@ -2,7 +2,7 @@
 #include "osapi.h"
 #include "os_type.h"
 #include "ets_sys.h"
-#include <esp_sdk_ver.h>
+#include "version.h"
 #include "etshal.h"
 #include "user_interface.h"
 #include "ets_alt_task.h"

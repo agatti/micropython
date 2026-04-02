@@ -65,12 +65,13 @@ BAUD ?= 115200
 FLASH_MODE ?= qio
 FLASH_SIZE ?= detect
 CROSS_COMPILE ?= xtensa-lx106-elf-
-ESP_SDK = $(shell $(CC) -print-sysroot)/usr
+ESP_SDK ?= $(shell $(CC) -print-sysroot)/usr
 
 INC += -I.
 INC += -I$(TOP)
 INC += -I$(BUILD)
 INC += -I$(ESP_SDK)/include
+INC += -I$(ESP_SDK)/third_party/include
 
 # UART for "os" messages. 0 is normal UART as used by MicroPython REPL,
 # 1 is debug UART (tx only), -1 to disable.
@@ -79,15 +80,19 @@ UART_OS = -1
 CFLAGS_XTENSA = -fsingle-precision-constant -Wdouble-promotion \
 	-D__ets__ -DICACHE_FLASH \
 	-fno-inline-functions \
-	-Wl,-EL -mlongcalls -mtext-section-literals -mforce-l32 \
+	-Wl,-EL -mlongcalls -mtext-section-literals \
 	-DLWIP_OPEN_SRC
 
-CFLAGS += $(INC) -Wall -Wpointer-arith -Werror -std=gnu99 -DUART_OS=$(UART_OS) \
+CFLAGS += $(INC) -Wall -Wpointer-arith -Werror -Wno-comment -std=gnu99 -DUART_OS=$(UART_OS) \
 	$(CFLAGS_XTENSA) $(COPT) $(CFLAGS_EXTRA) -I$(BOARD_DIR)
 
 LD_FILES ?= boards/esp8266_2m.ld
-LDFLAGS += -nostdlib -T $(LD_FILES) -Map=$(@:.elf=.map) --cref
-LIBS += -L$(ESP_SDK)/lib -lmain -ljson -llwip_open -lpp -lnet80211 -lwpa -lphy -lnet80211
+LDFLAGS += -nostdlib -T $(LD_FILES) -Map=$(@:.elf=.map) --cref \
+	--wrap=malloc --wrap=free --wrap=calloc --wrap=realloc \
+	-static -u call_user_start1
+LIBS += -L$(ESP_SDK)/lib --start-group \
+	-lc -lcrypto -lmain -ljson -llwip -lpp -lnet80211 -lwpa -lphy -lnet80211 \
+	--end-group
 
 ifeq ($(MICROPY_PY_ESPNOW),1)
 CFLAGS += -DMICROPY_PY_ESPNOW=1

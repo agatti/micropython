@@ -79,8 +79,8 @@ typedef struct {
 } __attribute__((packed)) espnow_pkt_t;
 
 // The maximum length of an espnow packet (bytes)
-static const size_t MAX_PACKET_LEN = (
-    sizeof(espnow_pkt_t) + ESP_NOW_MAX_DATA_LEN);
+// static const size_t MAX_PACKET_LEN = (
+//    sizeof(espnow_pkt_t) + ESP_NOW_MAX_DATA_LEN);
 
 // Enough for 2 full-size packets: 2 * (6 + 2 + 250) = 516 bytes
 // Will allocate an additional 7 bytes for buffer overhead

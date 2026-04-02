@@ -32,7 +32,7 @@
 
 // Functions for external libs like axTLS, BerkeleyDB, etc.
 
-void *malloc(size_t size) {
+void *__wrap_malloc(size_t size) {
     void *p = gc_alloc(size, 0);
     if (p == NULL) {
         // POSIX requires ENOMEM to be set in case of error
@@ -40,13 +40,16 @@ void *malloc(size_t size) {
     }
     return p;
 }
-void free(void *ptr) {
+
+void __wrap_free(void *ptr) {
     gc_free(ptr);
 }
-void *calloc(size_t nmemb, size_t size) {
-    return malloc(nmemb * size);
+
+void *__wrap_calloc(size_t nmemb, size_t size) {
+    return __wrap_malloc(nmemb * size);
 }
-void *realloc(void *ptr, size_t size) {
+
+void *__wrap_realloc(void *ptr, size_t size) {
     void *p = gc_realloc(ptr, size, true);
     if (p == NULL) {
         // POSIX requires ENOMEM to be set in case of error

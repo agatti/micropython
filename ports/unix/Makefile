@@ -181,7 +181,15 @@ endif
 
 ifeq ($(MICROPY_PY_BLUETOOTH),1)
 ifeq ($(MICROPY_BLUETOOTH_BTSTACK),1)
+
+ifeq ($(MICROPY_BLUETOOTH_BTSTACK_USB),0)
 SRC_BTSTACK_C += lib/btstack/platform/embedded/btstack_run_loop_embedded.c
+endif
+
+ifeq ($(MICROPY_BLUETOOTH_BTSTACK_USB),1)
+SRC_BTSTACK_C += lib/btstack/platform/posix/btstack_run_loop_posix.c
+endif
+
 endif
 endif
 

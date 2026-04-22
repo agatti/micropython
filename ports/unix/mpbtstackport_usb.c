@@ -42,6 +42,10 @@
 
 #include "extmod/btstack/modbluetooth_btstack.h"
 
+#if MICROPY_BLUETOOTH_BTSTACK_HCI_DUMP
+#include "lib/btstack/platform/posix/hci_dump_posix_fs.h"
+#endif
+
 #include "mpbtstackport.h"
 
 #if !MICROPY_PY_THREAD
@@ -51,6 +55,31 @@
 #define DEBUG_printf(...) // printf("mpbtstackport_usb.c: " __VA_ARGS__)
 
 void mp_bluetooth_btstack_port_init_usb(void) {
+    #if MICROPY_BLUETOOTH_BTSTACK_HCI_DUMP
+    // Log to file using HCI_DUMP_PACKETLOGGER format
+    {
+        VSTR_FIXED(dump_file_path, PATH_MAX);
+        const char *env_path = getenv("MICROPY_BLUETOOTH_HCI_DUMP");
+        if (env_path != NULL) {
+            vstr_add_str(&dump_file_path, env_path);
+        } else {
+            // As per POSIX specs.
+            const char *temporary_directory = getenv("TMPDIR");
+            if (temporary_directory != NULL) {
+                vstr_add_str(&dump_file_path, temporary_directory);
+            } else {
+                vstr_add_str(&dump_file_path, "/tmp");
+            }
+            vstr_add_str(&dump_file_path, "/hci_dump.pklg");
+        }
+        DEBUG_printf("Packet log file at: %s\n", vstr_str(&dump_file_path));
+        hci_dump_posix_fs_open(vstr_str(&dump_file_path), HCI_DUMP_PACKETLOGGER);
+    }
+
+    const hci_dump_t *hci_dump_impl = hci_dump_posix_fs_get_instance();
+    hci_dump_init(hci_dump_impl);
+    #endif
+
     btstack_run_loop_init(btstack_run_loop_posix_get_instance());
 
     // MICROPYBTUSB can be a ':'' or '-' separated port list.
@@ -114,6 +143,12 @@ void mp_bluetooth_btstack_port_deinit(void) {
 
     DEBUG_printf("mp_bluetooth_btstack_port_deinit: pthread_join()\n");
     pthread_join(bstack_thread_id, NULL);
+
+    #if MICROPY_BLUETOOTH_BTSTACK_HCI_DUMP
+    DEBUG_printf("mp_bluetooth_btstack_port_deinit: hci_dump_posix_fs_close()\n");
+    hci_dump_posix_fs_close();
+    #endif
+
     DEBUG_printf("mp_bluetooth_btstack_port_deinit: end\n");
 }
 

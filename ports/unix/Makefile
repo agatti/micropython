@@ -57,6 +57,11 @@ MICROPY_BLUETOOTH_BTSTACK_USB ?= 0
 MICROPY_BLUETOOTH_BTSTACK_H4 ?= 1
 endif
 
+# MICROPY_BLUETOOTH_BTSTACK_HCI_DUMP could be set to 1 to activate logging
+# for btstack-over-usb to either "$(TMPDIR)/hci_dump.pklg" or to the path
+# provided by the MICROPY_BLUETOOTH_HCI_DUMP environment variable.
+MICROPY_BLUETOOTH_BTSTACK_HCI_DUMP ?= 0
+
 ifeq ($(MICROPY_BLUETOOTH_BTSTACK_USB),1)
 # ../../lib/btstack/platform/libusb/hci_transport_h2_libusb.c:1354:13:
 # error: ‘signal_sco_can_send_now’ defined but not used [-Werror=unused-function]
@@ -190,6 +195,10 @@ ifeq ($(MICROPY_BLUETOOTH_BTSTACK_USB),1)
 SRC_BTSTACK_C += lib/btstack/platform/posix/btstack_run_loop_posix.c
 endif
 
+ifeq ($(MICROPY_BLUETOOTH_BTSTACK_HCI_DUMP),1)
+CFLAGS += -DMICROPY_BLUETOOTH_BTSTACK_HCI_DUMP=1
+SRC_BTSTACK_C += lib/btstack/platform/posix/hci_dump_posix_fs.c
+endif
 endif
 endif
 

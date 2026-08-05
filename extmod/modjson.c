@@ -156,6 +156,7 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
     mp_obj_t stack_top = MP_OBJ_NULL;
     const mp_obj_type_t *stack_top_type = NULL;
     mp_obj_t stack_key = MP_OBJ_NULL;
+    bool separator_seen = false;
     S_NEXT(s);
     for (;;) {
     cont:
@@ -174,6 +175,7 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
             case '\t':
             case '\n':
             case '\r':
+                separator_seen |= cur == ',';
                 goto cont;
             case 'n':
                 if (S_CUR(s) == 'u' && S_NEXT(s) == 'l' && S_NEXT(s) == 'l') {
@@ -274,6 +276,11 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
                     next = mp_parse_num_float(vstr.buf, vstr.len, false, NULL);
                 } else {
                     next = mp_parse_num_integer(vstr.buf, vstr.len, 10, NULL);
+                    // is it proper base10?
+                    size_t offset = (vstr.buf[0] == '-' || vstr.buf[0] == '+') ? 1 : 0;
+                    if (vstr.len > offset + 1 && vstr.buf[offset] == '0') {
+                        goto fail;
+                    }
                 }
                 break;
             }
@@ -289,6 +296,10 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
             case ']': {
                 if (stack_top == MP_OBJ_NULL) {
                     // no object at all
+                    goto fail;
+                }
+                if (stack_key != MP_OBJ_NULL) {
+                    // partial dict?
                     goto fail;
                 }
                 if (stack.len == 0) {
@@ -310,12 +321,22 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
                 // finished; single primitive only
                 goto success;
             }
+            stack_key = MP_OBJ_NULL;
         } else {
             // append to list or dict
             if (stack_top_type == &mp_type_list) {
+                // properly separated entries?
+                if (((mp_obj_list_t *)MP_OBJ_TO_PTR(stack_top))->len != 0 && !separator_seen) {
+                    goto fail;
+                }
                 mp_obj_list_append(stack_top, next);
+                separator_seen = false;
             } else {
                 if (stack_key == MP_OBJ_NULL) {
+                    // properly separated entries?
+                    if (mp_obj_dict_len(stack_top) > 0 && !separator_seen) {
+                        goto fail;
+                    }
                     stack_key = next;
                     if (enter) {
                         goto fail;
@@ -323,6 +344,7 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
                 } else {
                     mp_obj_dict_store(stack_top, stack_key, next);
                     stack_key = MP_OBJ_NULL;
+                    separator_seen = false;
                 }
             }
             if (enter) {
@@ -338,6 +360,9 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
         }
     }
 success:
+    if (separator_seen) {
+        goto fail;
+    }
     // eat trailing whitespace
     while (unichar_isspace(S_CUR(s))) {
         S_NEXT(s);

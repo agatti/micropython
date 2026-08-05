@@ -95,3 +95,27 @@ try:
     my_print(json.loads('[0, {"a":0, '))
 except ValueError:
     print("ValueError")
+
+# numbers must be in base 10
+try:
+    my_print(json.loads('{"a": 01}'))
+except ValueError:
+    print("ValueError")
+
+# missing separator
+try:
+    my_print(json.loads('{"a": 1 "b": 2}'))
+except ValueError:
+    print("ValueError")
+
+# extra separator
+try:
+    my_print(json.loads('{"a": 1,}'))
+except ValueError:
+    print("ValueError")
+
+# missing key but with closing bracket
+try:
+    my_print(json.loads('{"a":}'))
+except ValueError:
+    print("ValueError")

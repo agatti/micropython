@@ -12,6 +12,8 @@ LDSCRIPT = mcu/rv32/virt.ld
 MICROPY_HW_ROMFS_PART0_START = 0x80610000
 MICROPY_HW_ROMFS_PART0_SIZE = 0x00400000
 
-SRC_BOARD_O += shared/runtime/gchelper_native.o shared/runtime/gchelper_rv32i.o
+SRC_BOARD_O += shared/runtime/gchelper_native.o \
+	shared/runtime/gchelper_rv32i.o \
+	shared/runtime/aes_rv32.o
 
 MPY_CROSS_FLAGS += -march=rv32imc -march-flags=zba,zcmp

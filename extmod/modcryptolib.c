@@ -195,8 +195,21 @@ static void aes_final_set_key_impl(AES_CTX_IMPL *ctx, bool encrypt) {
     }
 }
 
+#define RV32_ACCELERATED_AES
+
 static void aes_process_ecb_impl(AES_CTX_IMPL *ctx, const uint8_t in[16], uint8_t out[16], bool encrypt) {
+    #if RV32_ACCELERATED_AES
+    extern void aes128_ecb_rv32_zkne(const uint8_t in[16], uint8_t out[16], const uint32_t *roundkey, size_t rounds);
+    extern void aes128_ecb_rv32_zknd(const uint8_t in[16], uint8_t out[16], const uint32_t *roundkey, size_t rounds);
+
+    if (encrypt) {
+        aes128_ecb_rv32_zkne(in, out, (&ctx->u.mbedtls_ctx.buf + (ptrdiff_t)ctx->u.mbedtls_ctx.rk_offset), ctx->u.mbedtls_ctx.nr);
+    } else {
+        aes128_ecb_rv32_zknd(in, out, (&ctx->u.mbedtls_ctx.buf + (ptrdiff_t)ctx->u.mbedtls_ctx.rk_offset), ctx->u.mbedtls_ctx.nr);
+    }
+    #else
     mbedtls_aes_crypt_ecb(&ctx->u.mbedtls_ctx, encrypt ? MBEDTLS_AES_ENCRYPT : MBEDTLS_AES_DECRYPT, in, out);
+    #endif
 }
 
 static void aes_process_cbc_impl(AES_CTX_IMPL *ctx, const uint8_t *in, uint8_t *out, size_t in_len, bool encrypt) {

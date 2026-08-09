@@ -157,3 +157,17 @@ try:
     my_print(json.loads('{"key":"value", "key2":}'))
 except ValueError:
     print("ValueError")
+
+# multiple element separators
+try:
+    my_print(json.loads('{"a"::"b"}'))
+except ValueError:
+    print("ValueError")
+try:
+    my_print(json.loads("[1,,2]"))
+except ValueError:
+    print("ValueError")
+try:
+    my_print(json.loads("[1,:2]"))
+except ValueError:
+    print("ValueError")

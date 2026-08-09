@@ -156,6 +156,7 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
     mp_obj_t stack_top = MP_OBJ_NULL;
     const mp_obj_type_t *stack_top_type = NULL;
     mp_obj_t stack_key = MP_OBJ_NULL;
+    bool separator_found = false;
     S_NEXT(s);
     for (;;) {
     cont:
@@ -170,6 +171,11 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
         switch (cur) {
             case ',':
             case ':':
+                if (separator_found) {
+                    goto fail;
+                }
+                separator_found = true;
+                goto cont;
             case ' ':
             case '\t':
             case '\n':
@@ -309,6 +315,7 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
                 stack.len -= 1;
                 stack_top = stack.items[stack.len];
                 stack_top_type = mp_obj_get_type(stack_top);
+                separator_found = false;
                 goto cont;
             }
             default:
@@ -350,6 +357,7 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
                 stack_top_type = mp_obj_get_type(stack_top);
             }
         }
+        separator_found = false;
     }
 success:
     // eat trailing whitespace

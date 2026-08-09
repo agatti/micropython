@@ -113,10 +113,10 @@ static MP_DEFINE_CONST_FUN_OBJ_1(mod_json_dumps_obj, mod_json_dumps);
 //
 // The JSON specification is at http://www.ietf.org/rfc/rfc4627.txt
 // The parser here will parse any valid JSON and return the correct
-// corresponding Python object.  It allows through a superset of JSON, since
-// it treats commas and colons as "whitespace", and doesn't care if
-// brackets/braces are correctly paired.  It will raise a ValueError if the
-// input is outside it's specs.
+// corresponding Python object.  It allows through a superset of JSON, since it
+// doesn't care if brackets/braces are correctly paired, or whether strings
+// contain either non-printable characters or invalid unicode codepoints.  It
+// will raise a ValueError if the input is outside its specs.
 //
 // Most of the work is parsing the primitives (null, false, true, numbers,
 // strings).  It does 1 pass over the input stream.  It tries to be fast and
@@ -331,10 +331,16 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
         } else {
             // append to list or dict
             if (stack_top_type == &mp_type_list) {
+                if (((mp_obj_list_t *)MP_OBJ_TO_PTR(stack_top))->len != 0 && !separator_found) {
+                    goto fail;
+                }
                 mp_obj_list_append(stack_top, next);
             } else {
                 if (stack_key == MP_OBJ_NULL) {
                     if (!mp_obj_is_str(next)) {
+                        goto fail;
+                    }
+                    if (mp_obj_dict_len(stack_top) > 0 && !separator_found) {
                         goto fail;
                     }
                     stack_key = next;

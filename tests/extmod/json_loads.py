@@ -181,3 +181,13 @@ try:
     my_print(json.loads('{"key":"value",}'))
 except ValueError:
     print("ValueError")
+
+# missing separators
+try:
+    my_print(json.loads("[1 true]"))
+except ValueError:
+    print("ValueError")
+try:
+    my_print(json.loads('{"a":1 "b":2}'))
+except ValueError:
+    print("ValueError")

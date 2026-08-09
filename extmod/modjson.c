@@ -156,7 +156,7 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
     mp_obj_t stack_top = MP_OBJ_NULL;
     const mp_obj_type_t *stack_top_type = NULL;
     mp_obj_t stack_key = MP_OBJ_NULL;
-    bool separator_found = false;
+    char separator = '\0';
     S_NEXT(s);
     for (;;) {
     cont:
@@ -171,10 +171,10 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
         switch (cur) {
             case ',':
             case ':':
-                if (separator_found) {
+                if (separator != '\0') {
                     goto fail;
                 }
-                separator_found = true;
+                separator = cur;
                 goto cont;
             case ' ':
             case '\t':
@@ -315,7 +315,7 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
                 stack.len -= 1;
                 stack_top = stack.items[stack.len];
                 stack_top_type = mp_obj_get_type(stack_top);
-                separator_found = false;
+                separator = '\0';
                 goto cont;
             }
             default:
@@ -331,9 +331,8 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
         } else {
             // append to list or dict
             if (stack_top_type == &mp_type_list) {
-                // !!len ^ separator is larger on xtensa
                 size_t len = ((mp_obj_list_t *)MP_OBJ_TO_PTR(stack_top))->len;
-                if ((len > 0 && !separator_found) || (len == 0 && separator_found)) {
+                if ((len > 0 && separator != ',') || (len == 0 && separator != '\0')) {
                     goto fail;
                 }
                 mp_obj_list_append(stack_top, next);
@@ -342,9 +341,8 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
                     if (!mp_obj_is_str(next)) {
                         goto fail;
                     }
-                    // !!len ^ separator is larger on xtensa
                     size_t len = mp_obj_dict_len(stack_top);
-                    if ((len > 0 && !separator_found) || (len == 0 && separator_found)) {
+                    if ((len > 0 && separator != ',') || (len == 0 && separator != '\0')) {
                         goto fail;
                     }
                     stack_key = next;
@@ -352,6 +350,9 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
                         goto fail;
                     }
                 } else {
+                    if (separator != ':') {
+                        goto fail;
+                    }
                     mp_obj_dict_store(stack_top, stack_key, next);
                     stack_key = MP_OBJ_NULL;
                 }
@@ -367,10 +368,10 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
                 stack_top_type = mp_obj_get_type(stack_top);
             }
         }
-        separator_found = false;
+        separator = '\0';
     }
 success:
-    if (separator_found) {
+    if (separator != '\0') {
         goto fail;
     }
     // eat trailing whitespace

@@ -201,3 +201,13 @@ try:
     my_print(json.loads('{, "a": 1}'))
 except ValueError:
     print("ValueError")
+
+# mismatched separators
+try:
+    my_print(json.loads("[1:2]"))
+except ValueError:
+    print("ValueError")
+try:
+    my_print(json.loads('{"a","b"}'))
+except ValueError:
+    print("ValueError")

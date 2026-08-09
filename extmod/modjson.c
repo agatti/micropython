@@ -319,6 +319,9 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
                 mp_obj_list_append(stack_top, next);
             } else {
                 if (stack_key == MP_OBJ_NULL) {
+                    if (!mp_obj_is_str(next)) {
+                        goto fail;
+                    }
                     stack_key = next;
                     if (enter) {
                         goto fail;

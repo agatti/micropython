@@ -113,3 +113,25 @@ try:
     my_print(json.loads("[+012]"))
 except ValueError:
     print("ValueError")
+
+# non-string object keys
+try:
+    my_print(json.loads("{1:1}"))
+except ValueError:
+    print("ValueError")
+try:
+    my_print(json.loads('{1:"1"}'))
+except ValueError:
+    print("ValueError")
+try:
+    my_print(json.loads("{null:null}"))
+except ValueError:
+    print("ValueError")
+try:
+    my_print(json.loads('{null: "value"}'))
+except ValueError:
+    print("ValueError")
+try:
+    my_print(json.loads("{9999E9999:1}"))
+except ValueError:
+    print("ValueError")

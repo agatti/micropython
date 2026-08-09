@@ -191,3 +191,13 @@ try:
     my_print(json.loads('{"a":1 "b":2}'))
 except ValueError:
     print("ValueError")
+
+# missing initial items
+try:
+    my_print(json.loads("[, 1]"))
+except ValueError:
+    print("ValueError")
+try:
+    my_print(json.loads('{, "a": 1}'))
+except ValueError:
+    print("ValueError")

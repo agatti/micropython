@@ -331,7 +331,9 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
         } else {
             // append to list or dict
             if (stack_top_type == &mp_type_list) {
-                if (((mp_obj_list_t *)MP_OBJ_TO_PTR(stack_top))->len != 0 && !separator_found) {
+                // !!len ^ separator is larger on xtensa
+                size_t len = ((mp_obj_list_t *)MP_OBJ_TO_PTR(stack_top))->len;
+                if ((len > 0 && !separator_found) || (len == 0 && separator_found)) {
                     goto fail;
                 }
                 mp_obj_list_append(stack_top, next);
@@ -340,7 +342,9 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
                     if (!mp_obj_is_str(next)) {
                         goto fail;
                     }
-                    if (mp_obj_dict_len(stack_top) > 0 && !separator_found) {
+                    // !!len ^ separator is larger on xtensa
+                    size_t len = mp_obj_dict_len(stack_top);
+                    if ((len > 0 && !separator_found) || (len == 0 && separator_found)) {
                         goto fail;
                     }
                     stack_key = next;

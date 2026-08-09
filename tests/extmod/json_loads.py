@@ -32,6 +32,8 @@ my_print(json.loads('"abc\\ndef"'))
 my_print(json.loads('"abc\\rdef"'))
 my_print(json.loads('"abc\\tdef"'))
 my_print(json.loads('"abc\\uabcd"'))
+my_print(json.loads('"\\""'))
+my_print(json.loads('"\\/"'))
 
 # whitespace handling
 my_print(json.loads('{\n\t"a":[]\r\n, "b":[1], "c":{"3":4}     \n\r\t\r\r\r\n}'))
@@ -133,5 +135,15 @@ except ValueError:
     print("ValueError")
 try:
     my_print(json.loads("{9999E9999:1}"))
+except ValueError:
+    print("ValueError")
+
+# unsupported string escape
+try:
+    my_print(json.loads('"\\a"'))
+except ValueError:
+    print("ValueError")
+try:
+    my_print(json.loads('"\\z"'))
 except ValueError:
     print("ValueError")

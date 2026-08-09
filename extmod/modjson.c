@@ -233,6 +233,10 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
                                 vstr_add_char(&vstr, num);
                                 goto str_cont;
                             }
+                            default:
+                                if (c != '/' && c != '\"') {
+                                    goto fail;
+                                }
                         }
                     }
                     vstr_add_byte(&vstr, c);

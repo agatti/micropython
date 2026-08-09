@@ -274,6 +274,9 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
                     next = mp_parse_num_float(vstr.buf, vstr.len, false, NULL);
                 } else {
                     next = mp_parse_num_integer(vstr.buf, vstr.len, 10, NULL);
+                    if (vstr.len > 1 && vstr.buf[vstr.buf[0] == '-'] == '0') {
+                        goto fail;
+                    }
                 }
                 break;
             }

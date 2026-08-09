@@ -95,3 +95,21 @@ try:
     my_print(json.loads('[0, {"a":0, '))
 except ValueError:
     print("ValueError")
+
+# incorrect base 10 number representation
+try:
+    my_print(json.loads("[-01]"))
+except ValueError:
+    print("ValueError")
+try:
+    my_print(json.loads("[-012]"))
+except ValueError:
+    print("ValueError")
+try:
+    my_print(json.loads("[012]"))
+except ValueError:
+    print("ValueError")
+try:
+    my_print(json.loads("[+012]"))
+except ValueError:
+    print("ValueError")

@@ -171,3 +171,13 @@ try:
     my_print(json.loads("[1,:2]"))
 except ValueError:
     print("ValueError")
+
+# trailing separators
+try:
+    my_print(json.loads("[1,]"))
+except ValueError:
+    print("ValueError")
+try:
+    my_print(json.loads('{"key":"value",}'))
+except ValueError:
+    print("ValueError")

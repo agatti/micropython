@@ -360,6 +360,9 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
         separator_found = false;
     }
 success:
+    if (separator_found) {
+        goto fail;
+    }
     // eat trailing whitespace
     while (unichar_isspace(S_CUR(s))) {
         S_NEXT(s);

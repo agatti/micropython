@@ -147,3 +147,13 @@ try:
     my_print(json.loads('"\\z"'))
 except ValueError:
     print("ValueError")
+
+# dict pair with key and no value
+try:
+    my_print(json.loads('{"key":}'))
+except ValueError:
+    print("ValueError")
+try:
+    my_print(json.loads('{"key":"value", "key2":}'))
+except ValueError:
+    print("ValueError")

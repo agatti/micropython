@@ -298,6 +298,10 @@ static mp_obj_t mod_json_load(mp_obj_t stream_obj) {
                     // no object at all
                     goto fail;
                 }
+                if (stack_key != MP_OBJ_NULL) {
+                    // dict key with no value
+                    goto fail;
+                }
                 if (stack.len == 0) {
                     // finished; compound object
                     goto success;

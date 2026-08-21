@@ -1,0 +1,2 @@
+# Enable ESP-IDF Wi-Fi Easy-Connect™ support.
+CONFIG_ESP_WIFI_DPP_SUPPORT=y
